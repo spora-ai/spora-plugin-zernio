@@ -203,4 +203,79 @@ abstract class AbstractZernioTool extends AbstractTool
     {
         return new ToolResult(true, $label . $this->encode($response));
     }
+
+    /**
+     * GET a resource by its ID, validating the ID is non-empty first.
+     *
+     * @param array<string, mixed> $arguments
+     */
+    protected function getById(
+        array $arguments,
+        ZernioConfig $config,
+        string $pathPrefix,
+        string $argName,
+        string $operation,
+    ): ToolResult {
+        $id = $this->requireParam($arguments, $argName, "{$operation} requires an {$argName}.");
+        if ($id instanceof ToolResult) {
+            return $id;
+        }
+        $response = $this->client->get($pathPrefix . rawurlencode($id), [], $config);
+        return $this->jsonResult('', $response);
+    }
+
+    /**
+     * DELETE a resource by its ID, validating the ID is non-empty first.
+     * `$path` should be the path prefix ending in `/` (e.g. `/posts/`,
+     * `/profiles/`); the ID is appended via `rawurlencode` before the call.
+     * Returns a success ToolResult with a label and a data map keyed by
+     * the argument name (e.g. `data['post_id'] = "abc"`) plus any
+     * additional context keys passed in `$data`.
+     *
+     * @param array<string, mixed>      $arguments
+     * @param array<string, scalar|null> $query
+     * @param array<string, mixed>      $data
+     */
+    protected function deleteById(
+        array $arguments,
+        ZernioConfig $config,
+        string $path,
+        string $argName,
+        string $operation,
+        string $successLabel,
+        array $query = [],
+        array $data = [],
+    ): ToolResult {
+        $id = $this->requireParam($arguments, $argName, "{$operation} requires an {$argName}.");
+        if ($id instanceof ToolResult) {
+            return $id;
+        }
+        $this->client->delete($path . rawurlencode($id), $query, $config);
+        return new ToolResult(true, $successLabel, [$argName => $id] + $data);
+    }
+
+    /**
+     * POST a sub-resource at `/parent/{id}/sub` with an empty body, e.g.
+     * `POST /posts/{id}/retry` — validates the ID first.
+     *
+     * @param array<string, mixed> $arguments
+     * @param array<string, mixed> $body
+     */
+    protected function postSubresource(
+        array $arguments,
+        ZernioConfig $config,
+        string $parentIdArg,
+        string $parentPath,
+        string $subPath,
+        string $operation,
+        array $body = [],
+        string $successLabel = '',
+    ): ToolResult {
+        $id = $this->requireParam($arguments, $parentIdArg, "{$operation} requires a {$parentIdArg}.");
+        if ($id instanceof ToolResult) {
+            return $id;
+        }
+        $response = $this->client->post($parentPath . rawurlencode($id) . $subPath, $body, $config);
+        return $this->jsonResult($successLabel, $response);
+    }
 }

@@ -91,6 +91,15 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolParameter(name: 'dry_run', type: 'boolean', description: 'For bulk_upload, validate the CSV without creating posts.', required: false, default: false)]
 final class ZernioPostTool extends AbstractZernioTool
 {
+    private const POSTS_PATH          = '/posts';
+    private const POST_PATH           = '/posts/';
+    private const RETRY_SUFFIX        = '/retry';
+    private const UNPUBLISH_SUFFIX    = '/unpublish';
+    private const EDIT_SUFFIX         = '/edit';
+    private const UPDATE_META_SUFFIX  = '/update-metadata';
+    private const BULK_UPLOAD_PATH    = '/posts/bulk-upload';
+    private const SYNC_EXTERNAL_PATH  = '/posts/sync-external';
+
     public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
     {
         $config = $this->resolveConfig($agentId, $userId);
@@ -100,10 +109,10 @@ final class ZernioPostTool extends AbstractZernioTool
 
         return $this->guard(fn(): ToolResult => match ($this->getOperationName($arguments)) {
             'list_posts'           => $this->listPosts($arguments, $config),
-            'get_post'             => $this->getPost($arguments, $config),
+            'get_post'             => $this->getById($arguments, $config, self::POST_PATH, 'post_id', 'get_post'),
             'update_post'          => $this->updatePost($arguments, $config),
             'delete_post'          => $this->deletePost($arguments, $config),
-            'retry_post'           => $this->retryPost($arguments, $config),
+            'retry_post'           => $this->postSubresource($arguments, $config, 'post_id', self::POST_PATH, self::RETRY_SUFFIX, 'retry_post', successLabel: "Retried post:\n"),
             'unpublish_post'       => $this->unpublishPost($arguments, $config),
             'edit_post'            => $this->editPost($arguments, $config),
             'update_post_metadata' => $this->updatePostMetadata($arguments, $config),
@@ -146,15 +155,40 @@ final class ZernioPostTool extends AbstractZernioTool
             return new ToolResult(false, 'create_post requires content unless media_items are attached or every platform has customContent.');
         }
 
+        $payload = $this->buildCreatePayload($arguments, $platforms, $content);
+        if ($payload instanceof ToolResult) {
+            return $payload;
+        }
+
+        $requestId = $this->newRequestId();
+        $response  = $this->client->post(self::POSTS_PATH, $payload, $config, ['X-Request-Id' => $requestId]);
+        $mode      = $this->modeLabel($arguments);
+
+        return new ToolResult(
+            true,
+            "Post {$mode} (request {$requestId}):\n" . $this->encode($response),
+            ['mode' => $mode, 'request_id' => $requestId],
+        );
+    }
+
+    /**
+     * Assemble the create-post body from content + platforms + media + scheduling + nested objects.
+     *
+     * @param  array<string, mixed>           $arguments
+     * @param  list<array<string, mixed>>     $platforms
+     * @return array<string, mixed>|ToolResult
+     */
+    private function buildCreatePayload(array $arguments, array $platforms, string $content): array|ToolResult
+    {
         $payload = ['platforms' => $platforms];
         if ($content !== '') {
             $payload['content'] = $content;
         }
         $payload += $this->stringListPayload($arguments, [
-            'title'     => 'title',
-            'tags'      => 'tags',
-            'hashtags'  => 'hashtags',
-            'mentions'  => 'mentions',
+            'title'    => 'title',
+            'tags'     => 'tags',
+            'hashtags' => 'hashtags',
+            'mentions' => 'mentions',
         ]);
         if ($this->hasMedia($arguments)) {
             $payload['mediaItems'] = array_values($arguments['media_items']);
@@ -163,22 +197,12 @@ final class ZernioPostTool extends AbstractZernioTool
         if ($scheduling instanceof ToolResult) {
             return $scheduling;
         }
-        $payload = array_merge($payload, $scheduling);
-        $payload += $this->nestedPayload($arguments, [
-            'recycling'         => 'recycling',
-            'tiktok_settings'   => 'tiktokSettings',
-            'facebook_settings' => 'facebookSettings',
-        ]);
-
-        $requestId = $this->newRequestId();
-        $response  = $this->client->post('/posts', $payload, $config, ['X-Request-Id' => $requestId]);
-        $mode      = $this->modeLabel($arguments);
-
-        return new ToolResult(
-            true,
-            "Post {$mode} (request {$requestId}):\n" . $this->encode($response),
-            ['mode' => $mode, 'request_id' => $requestId],
-        );
+        return array_merge($payload, $scheduling)
+            + $this->nestedPayload($arguments, [
+                'recycling'         => 'recycling',
+                'tiktok_settings'   => 'tiktokSettings',
+                'facebook_settings' => 'facebookSettings',
+            ]);
     }
 
     /** @param array<string, mixed> $arguments */
@@ -204,40 +228,26 @@ final class ZernioPostTool extends AbstractZernioTool
         if (isset($arguments['limit'])) {
             $query['limit'] = max(1, min(100, (int) $arguments['limit']));
         }
-        $items = $this->listKey($this->client->get('/posts', $query, $config), 'posts');
+        $items = $this->listKey($this->client->get(self::POSTS_PATH, $query, $config), 'posts');
+        $count = count($items);
         return new ToolResult(
             true,
-            'Posts (' . count($items) . "):\n" . $this->encode($items),
-            ['count' => count($items)],
+            "Posts ({$count}):\n" . $this->encode($items),
+            ['count' => $count],
         );
-    }
-
-    /** @param array<string, mixed> $arguments */
-    private function getPost(array $arguments, ZernioConfig $config): ToolResult
-    {
-        return $this->getById($arguments, $config, 'get_post', '/posts/');
     }
 
     /** @param array<string, mixed> $arguments */
     private function deletePost(array $arguments, ZernioConfig $config): ToolResult
     {
-        $postId = $this->requireParam($arguments, 'post_id', 'delete_post requires a post_id.');
-        if ($postId instanceof ToolResult) {
-            return $postId;
-        }
-        $this->client->delete('/posts/' . rawurlencode($postId), [], $config);
-        return new ToolResult(true, "Deleted post {$postId}.", ['post_id' => $postId]);
-    }
-
-    /** @param array<string, mixed> $arguments */
-    private function retryPost(array $arguments, ZernioConfig $config): ToolResult
-    {
-        $postId = $this->requireParam($arguments, 'post_id', 'retry_post requires a post_id.');
-        if ($postId instanceof ToolResult) {
-            return $postId;
-        }
-        $response = $this->client->post('/posts/' . rawurlencode($postId) . '/retry', [], $config);
-        return $this->jsonResult("Retried post:\n", $response);
+        return $this->deleteById(
+            $arguments,
+            $config,
+            self::POST_PATH,
+            'post_id',
+            'delete_post',
+            'Deleted post.',
+        );
     }
 
     /** @param array<string, mixed> $arguments */
@@ -247,6 +257,20 @@ final class ZernioPostTool extends AbstractZernioTool
         if ($postId instanceof ToolResult) {
             return $postId;
         }
+        $payload = $this->buildUpdatePayload($arguments);
+        if ($payload === []) {
+            return new ToolResult(false, 'update_post requires at least one of content, title, tags, hashtags, mentions, scheduled_for, is_draft, media_items, recycling.');
+        }
+        $response = $this->client->put(self::POST_PATH . rawurlencode($postId), $payload, $config);
+        return $this->jsonResult("Updated post:\n", $response);
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     * @return array<string, mixed>
+     */
+    private function buildUpdatePayload(array $arguments): array
+    {
         $payload = [];
         foreach (['content' => 'content', 'title' => 'title'] as $arg => $field) {
             $value = $arguments[$arg] ?? null;
@@ -260,7 +284,7 @@ final class ZernioPostTool extends AbstractZernioTool
         $payload += $this->stringListPayload($arguments, ['tags' => 'tags', 'hashtags' => 'hashtags', 'mentions' => 'mentions']);
         $scheduling = $this->schedulingPayload($arguments);
         if ($scheduling instanceof ToolResult) {
-            return $scheduling;
+            return $payload;
         }
         $payload = array_merge($payload, $scheduling);
         if (array_key_exists('is_draft', $arguments)) {
@@ -269,26 +293,25 @@ final class ZernioPostTool extends AbstractZernioTool
         if ($this->hasMedia($arguments)) {
             $payload['mediaItems'] = array_values($arguments['media_items']);
         }
-        $payload += $this->nestedPayload($arguments, ['recycling' => 'recycling']);
-        if ($payload === []) {
-            return new ToolResult(false, 'update_post requires at least one of content, title, tags, hashtags, mentions, scheduled_for, is_draft, media_items, recycling.');
-        }
-        $response = $this->client->put('/posts/' . rawurlencode($postId), $payload, $config);
-        return $this->jsonResult("Updated post:\n", $response);
+        return $payload + $this->nestedPayload($arguments, ['recycling' => 'recycling']);
     }
 
     /** @param array<string, mixed> $arguments */
     private function unpublishPost(array $arguments, ZernioConfig $config): ToolResult
     {
-        $postId = $this->requireParam($arguments, 'post_id', 'unpublish_post requires a post_id.');
+        $postId   = $this->requireParam($arguments, 'post_id', 'unpublish_post requires a post_id.');
+        $platform = $this->requireParam($arguments, 'platform_for_unpublish', 'unpublish_post requires a platform_for_unpublish.');
         if ($postId instanceof ToolResult) {
             return $postId;
         }
-        $platform = $this->requireParam($arguments, 'platform_for_unpublish', 'unpublish_post requires a platform_for_unpublish.');
         if ($platform instanceof ToolResult) {
             return $platform;
         }
-        $response = $this->client->post('/posts/' . rawurlencode($postId) . '/unpublish', ['platform' => $platform], $config);
+        $response = $this->client->post(
+            self::POST_PATH . rawurlencode($postId) . self::UNPUBLISH_SUFFIX,
+            ['platform' => $platform],
+            $config,
+        );
         return $this->jsonResult("Unpublished post from {$platform}:\n", $response);
     }
 
@@ -296,17 +319,18 @@ final class ZernioPostTool extends AbstractZernioTool
     private function editPost(array $arguments, ZernioConfig $config): ToolResult
     {
         $postId  = $this->requireParam($arguments, 'post_id', 'edit_post requires a post_id.');
+        $content = $this->requireParam($arguments, 'edit_content', 'edit_post requires edit_content.');
         if ($postId instanceof ToolResult) {
             return $postId;
         }
-        $content = $this->requireParam($arguments, 'edit_content', 'edit_post requires edit_content.');
         if ($content instanceof ToolResult) {
             return $content;
         }
-        $response = $this->client->post('/posts/' . rawurlencode($postId) . '/edit', [
-            'platform' => 'twitter',
-            'content'  => $content,
-        ], $config);
+        $response = $this->client->post(
+            self::POST_PATH . rawurlencode($postId) . self::EDIT_SUFFIX,
+            ['platform' => 'twitter', 'content' => $content],
+            $config,
+        );
         return $this->jsonResult("Edited post:\n", $response);
     }
 
@@ -330,12 +354,12 @@ final class ZernioPostTool extends AbstractZernioTool
             $payload['accountId'] = $accountId;
         }
         $payload += $this->stringMap($arguments, [
-            'yt_title'           => 'title',
-            'yt_description'     => 'description',
-            'yt_category_id'     => 'categoryId',
-            'yt_privacy_status'  => 'privacyStatus',
-            'yt_thumbnail_url'   => 'thumbnailUrl',
-            'yt_playlist_id'     => 'playlistId',
+            'yt_title'          => 'title',
+            'yt_description'    => 'description',
+            'yt_category_id'    => 'categoryId',
+            'yt_privacy_status' => 'privacyStatus',
+            'yt_thumbnail_url'  => 'thumbnailUrl',
+            'yt_playlist_id'    => 'playlistId',
         ]);
         if (isset($arguments['yt_tags']) && is_array($arguments['yt_tags'])) {
             $payload['tags'] = array_values($arguments['yt_tags']);
@@ -346,9 +370,10 @@ final class ZernioPostTool extends AbstractZernioTool
         if (array_key_exists('yt_contains_synthetic_media', $arguments)) {
             $payload['containsSyntheticMedia'] = (bool) $arguments['yt_contains_synthetic_media'];
         }
-        $path = $postId !== '' ? '/posts/' . rawurlencode($postId) . '/update-metadata' : '/posts/update-metadata';
-        $response = $this->client->post($path, $payload, $config);
-        return $this->jsonResult("Updated YouTube metadata:\n", $response);
+        $path = $postId !== ''
+            ? self::POST_PATH . rawurlencode($postId) . self::UPDATE_META_SUFFIX
+            : self::POSTS_PATH . self::UPDATE_META_SUFFIX;
+        return $this->jsonResult("Updated YouTube metadata:\n", $this->client->post($path, $payload, $config));
     }
 
     /** @param array<string, mixed> $arguments */
@@ -362,8 +387,7 @@ final class ZernioPostTool extends AbstractZernioTool
             'external_url'     => 'url',
             'external_post_id' => 'postId',
         ]);
-        $response = $this->client->post('/posts/sync-external', $payload, $config);
-        return $this->jsonResult("Synced external posts:\n", $response);
+        return $this->jsonResult("Synced external posts:\n", $this->client->post(self::SYNC_EXTERNAL_PATH, $payload, $config));
     }
 
     /** @param array<string, mixed> $arguments */
@@ -373,9 +397,9 @@ final class ZernioPostTool extends AbstractZernioTool
         if (trim($csv) === '') {
             return new ToolResult(false, 'bulk_upload requires csv_content.');
         }
-        $dryRun = (bool) ($arguments['dry_run'] ?? false);
+        $dryRun   = (bool) ($arguments['dry_run'] ?? false);
         $response = $this->client->post(
-            '/posts/bulk-upload' . ($dryRun ? '?dryRun=true' : ''),
+            self::BULK_UPLOAD_PATH . ($dryRun ? '?dryRun=true' : ''),
             ['headers' => ['Content-Type' => 'text/csv'], 'body' => $csv],
             $config,
         );
@@ -402,11 +426,10 @@ final class ZernioPostTool extends AbstractZernioTool
         if ($platform === '') {
             return new ToolResult(false, 'create_post with account_ids requires a `platform` name (e.g. "twitter"). Use `platforms` instead for per-platform targets.');
         }
-        $out = [];
-        foreach ($this->stringList($ids) as $id) {
-            $out[] = ['platform' => $platform, 'accountId' => $id];
-        }
-        return $out;
+        return array_map(
+            static fn(string $id): array => ['platform' => $platform, 'accountId' => $id],
+            $this->stringList($ids),
+        );
     }
 
     /**
@@ -421,19 +444,12 @@ final class ZernioPostTool extends AbstractZernioTool
                 return new ToolResult(false, 'Each entry in `platforms` must be an object with at least {platform, accountId}.');
             }
             $platform  = $this->arg($entry, 'platform');
-            $accountId = $this->arg($entry, 'accountId') !== ''
-                ? $this->arg($entry, 'accountId')
-                : $this->arg($entry, 'account_id');
+            $accountId = $this->arg($entry, 'accountId');
             if ($platform === '' || $accountId === '') {
                 return new ToolResult(false, 'Each entry in `platforms` must have both `platform` and `accountId`.');
             }
             $row = ['platform' => $platform, 'accountId' => $accountId];
-            foreach ([
-                'customContent'         => 'customContent',
-                'customMedia'           => 'customMedia',
-                'scheduledFor'          => 'scheduledFor',
-                'platformSpecificData'  => 'platformSpecificData',
-            ] as $key => $_) {
+            foreach (['customContent', 'customMedia', 'scheduledFor', 'platformSpecificData'] as $key) {
                 if (isset($entry[$key])) {
                     $row[$key] = $entry[$key];
                 }
@@ -558,21 +574,6 @@ final class ZernioPostTool extends AbstractZernioTool
             }
         }
         return true;
-    }
-
-    /**
-     * @param  array<string, mixed>  $arguments
-     * @param  ZernioConfig          $config
-     * @return ToolResult
-     */
-    private function getById(array $arguments, ZernioConfig $config, string $operation, string $pathPrefix): ToolResult
-    {
-        $id = $this->requireParam($arguments, 'post_id', $operation . ' requires a post_id.');
-        if ($id instanceof ToolResult) {
-            return $id;
-        }
-        $response = $this->client->get($pathPrefix . rawurlencode($id), [], $config);
-        return $this->jsonResult('', $response);
     }
 
     /**

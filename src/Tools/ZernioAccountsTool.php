@@ -52,6 +52,12 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolParameter(name: 'x_capabilities', type: 'object', description: 'X-specific opt-in flags { analytics, inbox } (update_account).', required: false)]
 final class ZernioAccountsTool extends AbstractZernioTool
 {
+    private const ACCOUNTS_PATH     = '/accounts';
+    private const PROFILES_PATH     = '/profiles';
+    private const PROFILE_PATH      = '/profiles/';
+    private const ACCOUNT_PATH      = '/accounts/';
+    private const HEALTH_PATH       = '/accounts/health';
+
     public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
     {
         $config = $this->resolveConfig($agentId, $userId);
@@ -94,17 +100,15 @@ final class ZernioAccountsTool extends AbstractZernioTool
     /** @param array<string, mixed> $arguments */
     private function listAccounts(array $arguments, ZernioConfig $config): ToolResult
     {
-        $query    = $this->accountQuery($arguments);
-        $response = $this->client->get('/accounts', $query, $config);
+        $response = $this->client->get(self::ACCOUNTS_PATH, $this->accountQuery($arguments), $config);
         return $this->formatList('Accounts', $response, 'accounts');
     }
 
     /** @param array<string, mixed> $arguments */
     private function accountHealth(array $arguments, ZernioConfig $config): ToolResult
     {
-        $query    = $this->stringMap($arguments, ['profile_id' => 'profileId', 'platform' => 'platform', 'status' => 'status']);
-        $response = $this->client->get('/accounts/health', $query, $config);
-        return $this->jsonResult("Account health:\n", $response);
+        $query = $this->stringMap($arguments, ['profile_id' => 'profileId', 'platform' => 'platform', 'status' => 'status']);
+        return $this->jsonResult("Account health:\n", $this->client->get(self::HEALTH_PATH, $query, $config));
     }
 
     /** @param array<string, mixed> $arguments */
@@ -114,7 +118,7 @@ final class ZernioAccountsTool extends AbstractZernioTool
         if ($accountId instanceof ToolResult) {
             return $accountId;
         }
-        $response = $this->client->get('/accounts/' . rawurlencode($accountId) . '/health', [], $config);
+        $response = $this->client->get(self::ACCOUNT_PATH . rawurlencode($accountId) . '/health', [], $config);
         return $this->jsonResult("Account health:\n", $response);
     }
 
@@ -124,7 +128,7 @@ final class ZernioAccountsTool extends AbstractZernioTool
      */
     private function listProfiles(array $arguments, ZernioConfig $config): array
     {
-        return $this->client->get('/profiles', $this->overLimitQuery($arguments), $config);
+        return $this->client->get(self::PROFILES_PATH, $this->overLimitQuery($arguments), $config);
     }
 
     /**
@@ -156,7 +160,7 @@ final class ZernioAccountsTool extends AbstractZernioTool
         if ($payload instanceof ToolResult) {
             return $payload;
         }
-        $response = $this->client->post('/profiles', $payload, $config);
+        $response = $this->client->post(self::PROFILES_PATH, $payload, $config);
         return $this->jsonResult("Created profile:\n", $response);
     }
 
@@ -174,19 +178,21 @@ final class ZernioAccountsTool extends AbstractZernioTool
         if ($payload === []) {
             return new ToolResult(false, 'update_profile requires at least one of name, description, color, is_default.');
         }
-        $response = $this->client->put('/profiles/' . rawurlencode($profileId), $payload, $config);
+        $response = $this->client->put(self::PROFILE_PATH . rawurlencode($profileId), $payload, $config);
         return $this->jsonResult("Updated profile:\n", $response);
     }
 
     /** @param array<string, mixed> $arguments */
     private function deleteProfile(array $arguments, ZernioConfig $config): ToolResult
     {
-        $profileId = $this->requireParam($arguments, 'profile_id', 'delete_profile requires a profile_id.');
-        if ($profileId instanceof ToolResult) {
-            return $profileId;
-        }
-        $this->client->delete('/profiles/' . rawurlencode($profileId), [], $config);
-        return new ToolResult(true, "Deleted profile {$profileId}.", ['profile_id' => $profileId]);
+        return $this->deleteById(
+            $arguments,
+            $config,
+            self::PROFILE_PATH,
+            'profile_id',
+            'delete_profile',
+            'Deleted profile.',
+        );
     }
 
     /** @param array<string, mixed> $arguments */
@@ -203,7 +209,7 @@ final class ZernioAccountsTool extends AbstractZernioTool
         if ($payload === []) {
             return new ToolResult(false, 'update_account requires at least one of username, display_name, x_capabilities.');
         }
-        $response = $this->client->put('/accounts/' . rawurlencode($accountId), $payload, $config);
+        $response = $this->client->put(self::ACCOUNT_PATH . rawurlencode($accountId), $payload, $config);
         return $this->jsonResult("Updated account:\n", $response);
     }
 
@@ -218,23 +224,25 @@ final class ZernioAccountsTool extends AbstractZernioTool
         if ($profileId instanceof ToolResult) {
             return $profileId;
         }
-        $response = $this->client->patch('/accounts/' . rawurlencode($accountId), ['profileId' => $profileId], $config);
+        $response = $this->client->patch(self::ACCOUNT_PATH . rawurlencode($accountId), ['profileId' => $profileId], $config);
         return $this->jsonResult("Moved account:\n", $response);
     }
 
     /** @param array<string, mixed> $arguments */
     private function disconnectAccount(array $arguments, ZernioConfig $config): ToolResult
     {
-        $accountId = $this->requireParam($arguments, 'account_id', 'disconnect_account requires an account_id.');
-        if ($accountId instanceof ToolResult) {
-            return $accountId;
-        }
-        $this->client->delete('/accounts/' . rawurlencode($accountId), [], $config);
-        return new ToolResult(true, "Disconnected account {$accountId}.", ['account_id' => $accountId]);
+        return $this->deleteById(
+            $arguments,
+            $config,
+            self::ACCOUNT_PATH,
+            'account_id',
+            'disconnect_account',
+            'Disconnected account.',
+        );
     }
 
     /**
-     * @param  array<string, mixed> $arguments
+     * @param array<string, mixed> $arguments
      * @return array<string, mixed>|ToolResult
      */
     private function profilePayload(array $arguments): array|ToolResult
