@@ -44,15 +44,12 @@ final class ZernioMediaTool extends AbstractZernioTool
 {
     public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
     {
-        $config = $this->resolveConfig($agentId, $userId);
-        if ($config === null) {
-            return $this->missingCredentialResult();
-        }
-
-        return $this->guard(fn(): ToolResult => match ($this->getOperationName($arguments)) {
-            'upload_media' => $this->uploadDirect($arguments, $config),
-            default        => $this->presign($arguments, $config),
-        });
+        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+            fn(): ToolResult => match ($this->getOperationName($arguments)) {
+                'upload_media' => $this->uploadDirect($arguments, $config),
+                default        => $this->presign($arguments, $config),
+            },
+        ));
     }
 
     public function describeAction(array $arguments): string

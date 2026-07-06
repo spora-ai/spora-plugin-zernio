@@ -39,17 +39,14 @@ final class ZernioValidateTool extends AbstractZernioTool
 {
     public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
     {
-        $config = $this->resolveConfig($agentId, $userId);
-        if ($config === null) {
-            return $this->missingCredentialResult();
-        }
-
-        return $this->guard(fn(): ToolResult => match ($this->getOperationName($arguments)) {
-            'validate_post_length' => $this->postLength($arguments, $config),
-            'validate_media'       => $this->mediaUrl($arguments, $config),
-            'validate_subreddit'   => $this->subreddit($arguments, $config),
-            default                => $this->post($arguments, $config),
-        });
+        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+            fn(): ToolResult => match ($this->getOperationName($arguments)) {
+                'validate_post_length' => $this->postLength($arguments, $config),
+                'validate_media'       => $this->mediaUrl($arguments, $config),
+                'validate_subreddit'   => $this->subreddit($arguments, $config),
+                default                => $this->post($arguments, $config),
+            },
+        ));
     }
 
     public function describeAction(array $arguments): string

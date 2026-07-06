@@ -102,24 +102,21 @@ final class ZernioPostTool extends AbstractZernioTool
 
     public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
     {
-        $config = $this->resolveConfig($agentId, $userId);
-        if ($config === null) {
-            return $this->missingCredentialResult();
-        }
-
-        return $this->guard(fn(): ToolResult => match ($this->getOperationName($arguments)) {
-            'list_posts'           => $this->listPosts($arguments, $config),
-            'get_post'             => $this->getById($arguments, $config, self::POST_PATH, 'post_id', 'get_post'),
-            'update_post'          => $this->updatePost($arguments, $config),
-            'delete_post'          => $this->deletePost($arguments, $config),
-            'retry_post'           => $this->postSubresource($arguments, $config, 'post_id', self::POST_PATH, self::RETRY_SUFFIX, 'retry_post', successLabel: "Retried post:\n"),
-            'unpublish_post'       => $this->unpublishPost($arguments, $config),
-            'edit_post'            => $this->editPost($arguments, $config),
-            'update_post_metadata' => $this->updatePostMetadata($arguments, $config),
-            'sync_external_posts'  => $this->syncExternalPosts($arguments, $config),
-            'bulk_upload'          => $this->bulkUpload($arguments, $config),
-            default                => $this->createPost($arguments, $config),
-        });
+        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+            fn(): ToolResult => match ($this->getOperationName($arguments)) {
+                'list_posts'           => $this->listPosts($arguments, $config),
+                'get_post'             => $this->getById($arguments, $config, self::POST_PATH, 'post_id', 'get_post'),
+                'update_post'          => $this->updatePost($arguments, $config),
+                'delete_post'          => $this->deletePost($arguments, $config),
+                'retry_post'           => $this->postSubresource($arguments, $config, 'post_id', self::POST_PATH, self::RETRY_SUFFIX, 'retry_post', successLabel: "Retried post:\n"),
+                'unpublish_post'       => $this->unpublishPost($arguments, $config),
+                'edit_post'            => $this->editPost($arguments, $config),
+                'update_post_metadata' => $this->updatePostMetadata($arguments, $config),
+                'sync_external_posts'  => $this->syncExternalPosts($arguments, $config),
+                'bulk_upload'          => $this->bulkUpload($arguments, $config),
+                default                => $this->createPost($arguments, $config),
+            },
+        ));
     }
 
     public function describeAction(array $arguments): string

@@ -57,20 +57,17 @@ final class ZernioAnalyticsTool extends AbstractZernioTool
 {
     public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
     {
-        $config = $this->resolveConfig($agentId, $userId);
-        if ($config === null) {
-            return $this->missingCredentialResult();
-        }
-
-        return $this->guard(fn(): ToolResult => match ($this->getOperationName($arguments)) {
-            'follower_analytics' => $this->followerAnalytics($arguments, $config),
-            'best_time_to_post'  => $this->bestTimeToPost($arguments, $config),
-            'content_decay'      => $this->contentDecay($arguments, $config),
-            'daily_metrics'      => $this->profileRead('Daily metrics', '/analytics/daily-metrics', $arguments, $config),
-            'posting_frequency'  => $this->profileRead('Posting frequency', '/analytics/posting-frequency', $arguments, $config),
-            'account_health'     => $this->accountHealth($arguments, $config),
-            default              => $this->postAnalytics($arguments, $config),
-        });
+        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+            fn(): ToolResult => match ($this->getOperationName($arguments)) {
+                'follower_analytics' => $this->followerAnalytics($arguments, $config),
+                'best_time_to_post'  => $this->bestTimeToPost($arguments, $config),
+                'content_decay'      => $this->contentDecay($arguments, $config),
+                'daily_metrics'      => $this->profileRead('Daily metrics', '/analytics/daily-metrics', $arguments, $config),
+                'posting_frequency'  => $this->profileRead('Posting frequency', '/analytics/posting-frequency', $arguments, $config),
+                'account_health'     => $this->accountHealth($arguments, $config),
+                default              => $this->postAnalytics($arguments, $config),
+            },
+        ));
     }
 
     public function describeAction(array $arguments): string

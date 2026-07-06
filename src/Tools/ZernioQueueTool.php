@@ -56,19 +56,16 @@ final class ZernioQueueTool extends AbstractZernioTool
 
     public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
     {
-        $config = $this->resolveConfig($agentId, $userId);
-        if ($config === null) {
-            return $this->missingCredentialResult();
-        }
-
-        return $this->guard(fn(): ToolResult => match ($this->getOperationName($arguments)) {
-            'preview_queue' => $this->readPath('Queue preview', '/queue/preview', $arguments, $config),
-            'next_slot'     => $this->readPath('Next slot', '/queue/next-slot', $arguments, $config),
-            'create_slot'   => $this->createSlot($arguments, $config),
-            'update_slot'   => $this->updateSlot($arguments, $config),
-            'delete_slot'   => $this->deleteSlot($arguments, $config),
-            default         => $this->listSlots($arguments, $config),
-        });
+        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+            fn(): ToolResult => match ($this->getOperationName($arguments)) {
+                'preview_queue' => $this->readPath('Queue preview', '/queue/preview', $arguments, $config),
+                'next_slot'     => $this->readPath('Next slot', '/queue/next-slot', $arguments, $config),
+                'create_slot'   => $this->createSlot($arguments, $config),
+                'update_slot'   => $this->updateSlot($arguments, $config),
+                'delete_slot'   => $this->deleteSlot($arguments, $config),
+                default         => $this->listSlots($arguments, $config),
+            },
+        ));
     }
 
     public function describeAction(array $arguments): string

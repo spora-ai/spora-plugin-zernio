@@ -278,4 +278,21 @@ abstract class AbstractZernioTool extends AbstractTool
         $response = $this->client->post($parentPath . rawurlencode($id) . $subPath, $body, $config);
         return $this->jsonResult($successLabel, $response);
     }
+
+    /**
+     * Resolve the ZernioConfig for this call, then run the operation
+     * inside the exception guard. Returns a missing-credential ToolResult
+     * if no API key is configured. Centralises the prelude every tool
+     * had to repeat.
+     *
+     * @param callable(ZernioConfig): ToolResult $operation
+     */
+    protected function withConfig(int $agentId, ?int $userId, callable $operation): ToolResult
+    {
+        $config = $this->resolveConfig($agentId, $userId);
+        if ($config === null) {
+            return $this->missingCredentialResult();
+        }
+        return $this->guard(static fn(): ToolResult => $operation($config));
+    }
 }

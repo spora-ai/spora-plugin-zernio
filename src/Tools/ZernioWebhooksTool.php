@@ -51,19 +51,16 @@ final class ZernioWebhooksTool extends AbstractZernioTool
 {
     public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
     {
-        $config = $this->resolveConfig($agentId, $userId);
-        if ($config === null) {
-            return $this->missingCredentialResult();
-        }
-
-        return $this->guard(fn(): ToolResult => match ($this->getOperationName($arguments)) {
-            'create_webhook'   => $this->createWebhook($arguments, $config),
-            'update_webhook'   => $this->updateWebhook($arguments, $config),
-            'delete_webhook'   => $this->deleteWebhook($arguments, $config),
-            'get_webhook_logs' => $this->webhookLogs($arguments, $config),
-            'test_webhook'     => $this->testWebhook($arguments, $config),
-            default            => $this->jsonResult("Webhooks:\n", $this->client->get('/webhooks/settings', [], $config)),
-        });
+        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+            fn(): ToolResult => match ($this->getOperationName($arguments)) {
+                'create_webhook'   => $this->createWebhook($arguments, $config),
+                'update_webhook'   => $this->updateWebhook($arguments, $config),
+                'delete_webhook'   => $this->deleteWebhook($arguments, $config),
+                'get_webhook_logs' => $this->webhookLogs($arguments, $config),
+                'test_webhook'     => $this->testWebhook($arguments, $config),
+                default            => $this->jsonResult("Webhooks:\n", $this->client->get('/webhooks/settings', [], $config)),
+            },
+        ));
     }
 
     public function describeAction(array $arguments): string

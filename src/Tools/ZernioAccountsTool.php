@@ -60,13 +60,8 @@ final class ZernioAccountsTool extends AbstractZernioTool
 
     public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
     {
-        $config = $this->resolveConfig($agentId, $userId);
-        if ($config === null) {
-            return $this->missingCredentialResult();
-        }
-
-        return $this->guard(function () use ($arguments, $config): ToolResult {
-            return match ($this->getOperationName($arguments)) {
+        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+            fn(): ToolResult => match ($this->getOperationName($arguments)) {
                 'list_profiles'      => $this->formatList('Profiles', $this->listProfiles($arguments, $config), 'profiles'),
                 'create_profile'     => $this->createProfile($arguments, $config),
                 'update_profile'     => $this->updateProfile($arguments, $config),
@@ -77,8 +72,8 @@ final class ZernioAccountsTool extends AbstractZernioTool
                 'account_health'     => $this->accountHealth($arguments, $config),
                 'get_account_health' => $this->getAccountHealth($arguments, $config),
                 default              => $this->listAccounts($arguments, $config),
-            };
-        });
+            },
+        ));
     }
 
     public function describeAction(array $arguments): string
