@@ -452,13 +452,10 @@ final class ZernioPostTool extends AbstractZernioTool
             if ($platform === '' || $accountId === '') {
                 return new ToolResult(false, 'Each entry in `platforms` must have both `platform` and `accountId`.');
             }
-            $row = ['platform' => $platform, 'accountId' => $accountId];
-            foreach (['customContent', 'customMedia', 'scheduledFor', 'platformSpecificData'] as $key) {
-                if (isset($entry[$key])) {
-                    $row[$key] = $entry[$key];
-                }
-            }
-            $out[] = $row;
+            $row    = ['platform' => $platform, 'accountId' => $accountId];
+            $known  = ['customContent', 'customMedia', 'scheduledFor', 'platformSpecificData'];
+            $extras = array_intersect_key($entry, array_flip($known));
+            $out[]  = array_merge($row, $extras);
         }
         return $out;
     }
@@ -565,15 +562,7 @@ final class ZernioPostTool extends AbstractZernioTool
      */
     private function everyPlatformHasCustomContent(array $platforms): bool
     {
-        if ($platforms === []) {
-            return false;
-        }
-        foreach ($platforms as $row) {
-            if (empty($row['customContent'])) {
-                return false;
-            }
-        }
-        return true;
+        return $platforms !== [] && array_all($platforms, static fn (array $row): bool => !empty($row['customContent']));
     }
 
     /**
