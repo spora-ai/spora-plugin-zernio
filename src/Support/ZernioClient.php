@@ -163,7 +163,10 @@ final class ZernioClient
             throw new ZernioApiException('Zernio API returned a non-JSON response: ' . $e->getMessage(), $status);
         }
 
-        return is_array($decoded) ? $decoded : ['data' => $decoded];
+        if (!is_array($decoded)) {
+            return ['data' => $decoded];
+        }
+        return $decoded;
     }
 
     private function transportFailure(string $url, TransportExceptionInterface $e): ZernioApiException

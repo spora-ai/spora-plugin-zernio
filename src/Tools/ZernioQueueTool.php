@@ -53,6 +53,15 @@ use Spora\Tools\ValueObjects\ToolResult;
 final class ZernioQueueTool extends AbstractZernioTool
 {
     private const SLOTS_PATH = '/queue/slots';
+    private const DAY_NAMES  = [
+        'sunday' => 0, 'sun' => 0,
+        'monday' => 1, 'mon' => 1,
+        'tuesday' => 2, 'tue' => 2, 'tues' => 2,
+        'wednesday' => 3, 'wed' => 3,
+        'thursday' => 4, 'thu' => 4, 'thurs' => 4,
+        'friday' => 5, 'fri' => 5,
+        'saturday' => 6, 'sat' => 6,
+    ];
 
     public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
     {
@@ -284,20 +293,11 @@ final class ZernioQueueTool extends AbstractZernioTool
             }
             $dayOfWeek = $numeric;
         } elseif (is_string($day)) {
-            $map = [
-                'sunday' => 0, 'sun' => 0,
-                'monday' => 1, 'mon' => 1,
-                'tuesday' => 2, 'tue' => 2, 'tues' => 2,
-                'wednesday' => 3, 'wed' => 3,
-                'thursday' => 4, 'thu' => 4, 'thurs' => 4,
-                'friday' => 5, 'fri' => 5,
-                'saturday' => 6, 'sat' => 6,
-            ];
             $key = strtolower(trim($day));
-            if (!isset($map[$key])) {
+            if (!isset(self::DAY_NAMES[$key])) {
                 return new ToolResult(false, '`day` must be a name ("monday".."sunday") or a number 0-6.');
             }
-            $dayOfWeek = $map[$key];
+            $dayOfWeek = self::DAY_NAMES[$key];
         } else {
             return new ToolResult(false, '`day` must be a string or integer.');
         }
