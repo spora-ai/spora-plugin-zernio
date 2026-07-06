@@ -1,0 +1,12 @@
+{
+    "$schema": "https://raw.githubusercontent.com/spora-ai/spora-core/v0.3.0/plugin.schema.json",
+    "slug": "zernio",
+    "description": "Zernio social-media scheduling and publishing for Spora agents.",
+    "class": "Spora\\Plugins\\Zernio\\ZernioPlugin",
+    "icon": "puzzle",
+    "autoload": {
+        "psr-4": {
+            "Spora\\Plugins\\Zernio\\": "src/"
+        }
+    }
+}
