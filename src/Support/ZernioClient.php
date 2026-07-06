@@ -101,29 +101,29 @@ final class ZernioClient
             'timeout' => $config->timeout,
         ]);
 
-        $attempt = 0;
-        while (true) {
-            $attempt++;
+        for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++) {
             $this->logRequest($method, $url, $attempt, $config->timeout);
 
             try {
                 $response = $this->httpClient->request($method, $url, $requestOptions);
                 $status   = $response->getStatusCode();
 
-                if ($this->isRetryable($status, $attempt)) {
+                if ($this->isRetryable($status, $attempt) && $attempt < self::MAX_ATTEMPTS) {
                     usleep($this->backoffMicroseconds($attempt));
                     continue;
                 }
 
                 return $this->decode($response, $status, $url);
             } catch (TransportExceptionInterface $e) {
-                if ($attempt < self::MAX_ATTEMPTS) {
-                    usleep($this->backoffMicroseconds($attempt));
-                    continue;
+                if ($attempt >= self::MAX_ATTEMPTS) {
+                    throw $this->transportFailure($url, $e);
                 }
-                throw $this->transportFailure($url, $e);
+                usleep($this->backoffMicroseconds($attempt));
             }
         }
+
+        // Unreachable: the loop always returns or throws, but PHP needs a return.
+        throw new ZernioApiException('Zernio API request failed: exhausted retries.');
     }
 
     private function logRequest(string $method, string $url, int $attempt, int $timeout): void
