@@ -562,7 +562,7 @@ final class ZernioPostTool extends AbstractZernioTool
      */
     private function everyPlatformHasCustomContent(array $platforms): bool
     {
-        return $platforms !== [] && array_all($platforms, static fn (array $row): bool => !empty($row['customContent']));
+        return $platforms !== [] && array_all($platforms, static fn(array $row): bool => !empty($row['customContent']));
     }
 
     /**
