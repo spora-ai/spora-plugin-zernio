@@ -50,11 +50,31 @@ abstract class AbstractZernioTool extends AbstractTool
         }
 
         $baseUrl = trim((string) ($settings['base_url'] ?? ''));
-        if ($baseUrl === '') {
+        if ($baseUrl === '' || !$this->isValidBaseUrl($baseUrl)) {
+            if ($baseUrl !== '') {
+                // Never send the bearer token to a malformed/unexpected host.
+                $this->logger?->warning('Zernio: ignoring invalid base_url, using default', ['base_url' => $baseUrl]);
+            }
             $baseUrl = self::DEFAULT_BASE_URL;
         }
 
         return new ZernioConfig($apiKey, $baseUrl, $this->effectiveTimeout($settings));
+    }
+
+    /**
+     * A base URL is only accepted if it is a well-formed http(s) URL with a
+     * host. Anything else falls back to the default so a misconfigured setting
+     * can't redirect the API key to an unintended destination.
+     */
+    private function isValidBaseUrl(string $url): bool
+    {
+        if (filter_var($url, FILTER_VALIDATE_URL) === false) {
+            return false;
+        }
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+        $host   = (string) parse_url($url, PHP_URL_HOST);
+
+        return $host !== '' && in_array($scheme, ['http', 'https'], true);
     }
 
     protected function missingCredentialResult(): ToolResult

@@ -89,6 +89,21 @@ it('drafts when neither publish_now nor scheduled_for is given', function (): vo
     expect($result->data['mode'])->toBe('drafted');
 });
 
+it('rejects scheduling without a timezone', function (): void {
+    $http = Mockery::mock(HttpClientInterface::class);
+    $http->shouldNotReceive('request');
+
+    $result = postTool($http)->execute([
+        'action'        => 'create_post',
+        'account_ids'   => ['a1'],
+        'content'       => 'Later',
+        'scheduled_for' => '2026-08-01T10:00:00Z',
+    ], agentId: 1);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->content)->toContain('timezone');
+});
+
 it('lists posts with status and profile filters', function (): void {
     $http = Mockery::mock(HttpClientInterface::class);
     $http->expects('request')

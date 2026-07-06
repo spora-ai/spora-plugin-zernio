@@ -90,6 +90,28 @@ it('converts an unexpected transport-layer throwable into a failed ToolResult', 
         ->and($result->content)->toContain('Zernio tool error');
 });
 
+it('falls back to the default base URL when the configured one is malformed', function (): void {
+    $http = Mockery::mock(HttpClientInterface::class);
+    $http->expects('request')
+        ->with('GET', 'https://zernio.com/api/v1/accounts', Mockery::any())
+        ->andReturn(zernioResponse(200, '{"data":[]}'));
+
+    $tool = accountsTool($http, ['api_key' => 'sk_test', 'base_url' => 'not a url']);
+
+    expect($tool->execute(['action' => 'list_accounts'], agentId: 1)->success)->toBeTrue();
+});
+
+it('honours a valid custom base URL', function (): void {
+    $http = Mockery::mock(HttpClientInterface::class);
+    $http->expects('request')
+        ->with('GET', 'https://api.staging.zernio.test/v2/accounts', Mockery::any())
+        ->andReturn(zernioResponse(200, '{"data":[]}'));
+
+    $tool = accountsTool($http, ['api_key' => 'sk_test', 'base_url' => 'https://api.staging.zernio.test/v2']);
+
+    expect($tool->execute(['action' => 'list_accounts'], agentId: 1)->success)->toBeTrue();
+});
+
 it('describes each account operation for the approval UI', function (): void {
     $tool = accountsTool(Mockery::mock(HttpClientInterface::class));
 

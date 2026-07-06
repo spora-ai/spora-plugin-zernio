@@ -80,10 +80,15 @@ final class ZernioPostTool extends AbstractZernioTool
         $content    = trim((string) ($arguments['content'] ?? ''));
 
         if ($accountIds === []) {
-            return new ToolResult(false, 'create_post requires at least one account_id (see zernio_accounts).');
+            return new ToolResult(false, 'create_post requires at least one account ID in account_ids (see zernio_accounts).');
         }
         if ($content === '') {
             return new ToolResult(false, 'create_post requires non-empty content.');
+        }
+
+        $scheduling = $this->schedulingPayload($arguments);
+        if ($scheduling instanceof ToolResult) {
+            return $scheduling;
         }
 
         $payload = ['accountIds' => $accountIds, 'content' => $content];
@@ -93,7 +98,7 @@ final class ZernioPostTool extends AbstractZernioTool
             $payload['mediaUrls'] = $mediaUrls;
         }
 
-        $payload += $this->schedulingPayload($arguments);
+        $payload += $scheduling;
 
         $response = $this->client->post('/posts', $payload, $config);
         $mode = $this->modeLabel($arguments);
@@ -106,26 +111,29 @@ final class ZernioPostTool extends AbstractZernioTool
     }
 
     /**
+     * Build the publish/schedule/draft fields, or a failed ToolResult when
+     * scheduling is requested without a timezone.
+     *
      * @param  array<string, mixed> $arguments
-     * @return array<string, mixed>
+     * @return array<string, mixed>|ToolResult
      */
-    private function schedulingPayload(array $arguments): array
+    private function schedulingPayload(array $arguments): array|ToolResult
     {
         if ((bool) ($arguments['publish_now'] ?? false)) {
             return ['publishNow' => true];
         }
 
         $scheduledFor = trim((string) ($arguments['scheduled_for'] ?? ''));
-        $timezone     = trim((string) ($arguments['timezone'] ?? ''));
-        if ($scheduledFor !== '') {
-            $payload = ['scheduledFor' => $scheduledFor];
-            if ($timezone !== '') {
-                $payload['timezone'] = $timezone;
-            }
-            return $payload;
+        if ($scheduledFor === '') {
+            return [];
         }
 
-        return [];
+        $timezone = trim((string) ($arguments['timezone'] ?? ''));
+        if ($timezone === '') {
+            return new ToolResult(false, 'Scheduling a post requires a timezone alongside scheduled_for.');
+        }
+
+        return ['scheduledFor' => $scheduledFor, 'timezone' => $timezone];
     }
 
     /**

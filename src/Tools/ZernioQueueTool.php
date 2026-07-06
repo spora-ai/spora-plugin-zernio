@@ -38,6 +38,8 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolParameter(name: 'timezone', type: 'string', description: 'IANA timezone for the slot, e.g. "Europe/Berlin". Used by create_slot/update_slot.', required: false)]
 final class ZernioQueueTool extends AbstractZernioTool
 {
+    private const SLOTS_PATH = '/queue/slots';
+
     public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
     {
         $config = $this->resolveConfig($agentId, $userId);
@@ -51,7 +53,7 @@ final class ZernioQueueTool extends AbstractZernioTool
             'create_slot'   => $this->createSlot($arguments, $config),
             'update_slot'   => $this->updateSlot($arguments, $config),
             'delete_slot'   => $this->deleteSlot($arguments, $config),
-            default         => $this->read('/queue/slots', 'Queue slots', $arguments, $config),
+            default         => $this->read(self::SLOTS_PATH, 'Queue slots', $arguments, $config),
         });
     }
 
@@ -90,7 +92,7 @@ final class ZernioQueueTool extends AbstractZernioTool
             return $payload;
         }
 
-        $response = $this->client->post('/queue/slots', $payload, $config);
+        $response = $this->client->post(self::SLOTS_PATH, $payload, $config);
 
         return new ToolResult(true, "Created queue slot:\n" . json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     }
@@ -111,7 +113,7 @@ final class ZernioQueueTool extends AbstractZernioTool
         }
         $payload['id'] = $slotId;
 
-        $response = $this->client->put('/queue/slots', $payload, $config);
+        $response = $this->client->put(self::SLOTS_PATH, $payload, $config);
 
         return new ToolResult(true, "Updated queue slot:\n" . json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     }
@@ -126,7 +128,7 @@ final class ZernioQueueTool extends AbstractZernioTool
             return new ToolResult(false, 'delete_slot requires a slot_id.');
         }
 
-        $this->client->delete('/queue/slots', ['id' => $slotId], $config);
+        $this->client->delete(self::SLOTS_PATH, ['id' => $slotId], $config);
 
         return new ToolResult(true, "Deleted queue slot {$slotId}.", ['slot_id' => $slotId]);
     }
