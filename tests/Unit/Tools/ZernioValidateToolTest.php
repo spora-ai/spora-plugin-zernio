@@ -2,17 +2,12 @@
 
 declare(strict_types=1);
 
-use Spora\Plugins\Zernio\Support\ZernioClient;
 use Spora\Plugins\Zernio\Tools\ZernioValidateTool;
-use Spora\Services\ToolConfigService;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 function validateTool(HttpClientInterface $http): ZernioValidateTool
 {
-    $config = Mockery::mock(ToolConfigService::class);
-    $config->allows('getEffectiveSettings')->andReturn(['api_key' => 'sk_test']);
-
-    return new ZernioValidateTool($config, new ZernioClient($http));
+    return zernioTool(ZernioValidateTool::class, $http);
 }
 
 it('validates a post via POST /tools/validate/post', function (): void {

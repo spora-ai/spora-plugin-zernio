@@ -80,62 +80,76 @@ final class ZernioAccountsTool extends AbstractZernioTool
         return match ($this->getOperationName($arguments)) {
             'list_profiles'      => 'List Zernio profiles',
             'create_profile'     => 'Create a Zernio profile',
-            'update_profile'     => 'Update Zernio profile ' . trim((string) ($arguments['profile_id'] ?? '')),
-            'delete_profile'     => 'Delete Zernio profile ' . trim((string) ($arguments['profile_id'] ?? '')),
-            'update_account'     => 'Update Zernio account ' . trim((string) ($arguments['account_id'] ?? '')),
-            'move_account'       => 'Move Zernio account ' . trim((string) ($arguments['account_id'] ?? '')),
-            'disconnect_account' => 'Disconnect Zernio account ' . trim((string) ($arguments['account_id'] ?? '')),
+            'update_profile'     => 'Update Zernio profile ' . $this->arg($arguments, 'profile_id'),
+            'delete_profile'     => 'Delete Zernio profile ' . $this->arg($arguments, 'profile_id'),
+            'update_account'     => 'Update Zernio account ' . $this->arg($arguments, 'account_id'),
+            'move_account'       => 'Move Zernio account ' . $this->arg($arguments, 'account_id'),
+            'disconnect_account' => 'Disconnect Zernio account ' . $this->arg($arguments, 'account_id'),
             'account_health'     => 'Get Zernio account health snapshot',
-            'get_account_health' => 'Get health for Zernio account ' . trim((string) ($arguments['account_id'] ?? '')),
+            'get_account_health' => 'Get health for Zernio account ' . $this->arg($arguments, 'account_id'),
             default              => 'List connected Zernio social accounts',
         };
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function listAccounts(array $arguments, ZernioConfig $config): ToolResult
     {
-        $query = $this->accountFilter($arguments);
+        $query    = $this->accountQuery($arguments);
         $response = $this->client->get('/accounts', $query, $config);
-
         return $this->formatList('Accounts', $response, 'accounts');
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     * @return array<string, scalar|null>
-     */
-    private function accountFilter(array $arguments): array
+    /** @param array<string, mixed> $arguments */
+    private function accountHealth(array $arguments, ZernioConfig $config): ToolResult
     {
-        $map = [
-            'profile_id'        => 'profileId',
-            'platform'          => 'platform',
-            'status'            => 'status',
-        ];
-        $query = $this->stringMap($arguments, $map);
-        if ((bool) ($arguments['include_over_limit'] ?? false)) {
-            $query['includeOverLimit'] = true;
+        $query    = $this->stringMap($arguments, ['profile_id' => 'profileId', 'platform' => 'platform', 'status' => 'status']);
+        $response = $this->client->get('/accounts/health', $query, $config);
+        return $this->jsonResult("Account health:\n", $response);
+    }
+
+    /** @param array<string, mixed> $arguments */
+    private function getAccountHealth(array $arguments, ZernioConfig $config): ToolResult
+    {
+        $accountId = $this->requireParam($arguments, 'account_id', 'get_account_health requires an account_id.');
+        if ($accountId instanceof ToolResult) {
+            return $accountId;
         }
-        return $query;
+        $response = $this->client->get('/accounts/' . rawurlencode($accountId) . '/health', [], $config);
+        return $this->jsonResult("Account health:\n", $response);
     }
 
     /**
-     * @param array<string, mixed> $arguments
+     * @param  array<string, mixed> $arguments
      * @return array<string, mixed>
      */
     private function listProfiles(array $arguments, ZernioConfig $config): array
     {
-        $query = [];
-        if ((bool) ($arguments['include_over_limit'] ?? false)) {
-            $query['includeOverLimit'] = true;
-        }
-        return $this->client->get('/profiles', $query, $config);
+        return $this->client->get('/profiles', $this->overLimitQuery($arguments), $config);
     }
 
     /**
-     * @param array<string, mixed> $arguments
+     * @param  array<string, mixed> $arguments
+     * @return array<string, scalar|null>
      */
+    private function accountQuery(array $arguments): array
+    {
+        return $this->stringMap($arguments, [
+            'profile_id' => 'profileId',
+            'platform'   => 'platform',
+            'status'     => 'status',
+        ]) + $this->overLimitQuery($arguments);
+    }
+
+    /**
+     * @param  array<string, mixed> $arguments
+     * @return array<string, bool>
+     */
+    private function overLimitQuery(array $arguments): array
+    {
+        return (bool) ($arguments['include_over_limit'] ?? false) ? ['includeOverLimit' => true] : [];
+    }
+
+    /** @param array<string, mixed> $arguments */
     private function createProfile(array $arguments, ZernioConfig $config): ToolResult
     {
         $payload = $this->profilePayload($arguments);
@@ -146,22 +160,14 @@ final class ZernioAccountsTool extends AbstractZernioTool
         return $this->jsonResult("Created profile:\n", $response);
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function updateProfile(array $arguments, ZernioConfig $config): ToolResult
     {
         $profileId = $this->requireParam($arguments, 'profile_id', 'update_profile requires a profile_id.');
         if ($profileId instanceof ToolResult) {
             return $profileId;
         }
-        $payload = [];
-        foreach (['name', 'description', 'color'] as $field) {
-            $value = trim((string) ($arguments[$field] ?? ''));
-            if ($value !== '') {
-                $payload[$field] = $value;
-            }
-        }
+        $payload = $this->stringMap($arguments, ['name' => 'name', 'description' => 'description', 'color' => 'color']);
         if (array_key_exists('is_default', $arguments)) {
             $payload['isDefault'] = (bool) $arguments['is_default'];
         }
@@ -172,9 +178,7 @@ final class ZernioAccountsTool extends AbstractZernioTool
         return $this->jsonResult("Updated profile:\n", $response);
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function deleteProfile(array $arguments, ZernioConfig $config): ToolResult
     {
         $profileId = $this->requireParam($arguments, 'profile_id', 'delete_profile requires a profile_id.');
@@ -185,22 +189,14 @@ final class ZernioAccountsTool extends AbstractZernioTool
         return new ToolResult(true, "Deleted profile {$profileId}.", ['profile_id' => $profileId]);
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function updateAccount(array $arguments, ZernioConfig $config): ToolResult
     {
         $accountId = $this->requireParam($arguments, 'account_id', 'update_account requires an account_id.');
         if ($accountId instanceof ToolResult) {
             return $accountId;
         }
-        $payload = [];
-        foreach (['username' => 'username', 'display_name' => 'displayName'] as $arg => $field) {
-            $value = trim((string) ($arguments[$arg] ?? ''));
-            if ($value !== '') {
-                $payload[$field] = $value;
-            }
-        }
+        $payload = $this->stringMap($arguments, ['username' => 'username', 'display_name' => 'displayName']);
         if (isset($arguments['x_capabilities']) && is_array($arguments['x_capabilities'])) {
             $payload['xCapabilities'] = $arguments['x_capabilities'];
         }
@@ -211,9 +207,7 @@ final class ZernioAccountsTool extends AbstractZernioTool
         return $this->jsonResult("Updated account:\n", $response);
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function moveAccount(array $arguments, ZernioConfig $config): ToolResult
     {
         $accountId = $this->requireParam($arguments, 'account_id', 'move_account requires an account_id.');
@@ -228,9 +222,7 @@ final class ZernioAccountsTool extends AbstractZernioTool
         return $this->jsonResult("Moved account:\n", $response);
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function disconnectAccount(array $arguments, ZernioConfig $config): ToolResult
     {
         $accountId = $this->requireParam($arguments, 'account_id', 'disconnect_account requires an account_id.');
@@ -242,41 +234,18 @@ final class ZernioAccountsTool extends AbstractZernioTool
     }
 
     /**
-     * @param array<string, mixed> $arguments
-     */
-    private function accountHealth(array $arguments, ZernioConfig $config): ToolResult
-    {
-        $query = $this->stringMap($arguments, ['profile_id' => 'profileId', 'platform' => 'platform', 'status' => 'status']);
-        $response = $this->client->get('/accounts/health', $query, $config);
-        return $this->jsonResult("Account health:\n", $response);
-    }
-
-    /**
-     * @param array<string, mixed> $arguments
-     */
-    private function getAccountHealth(array $arguments, ZernioConfig $config): ToolResult
-    {
-        $accountId = $this->requireParam($arguments, 'account_id', 'get_account_health requires an account_id.');
-        if ($accountId instanceof ToolResult) {
-            return $accountId;
-        }
-        $response = $this->client->get('/accounts/' . rawurlencode($accountId) . '/health', [], $config);
-        return $this->jsonResult("Account health:\n", $response);
-    }
-
-    /**
-     * @param array<string, mixed> $arguments
+     * @param  array<string, mixed> $arguments
      * @return array<string, mixed>|ToolResult
      */
     private function profilePayload(array $arguments): array|ToolResult
     {
-        $name = trim((string) ($arguments['name'] ?? ''));
+        $name = $this->arg($arguments, 'name');
         if ($name === '') {
             return new ToolResult(false, 'create_profile requires a name.');
         }
         $payload = ['name' => $name];
-        foreach (['description' => 'description', 'color' => 'color'] as $arg => $field) {
-            $value = trim((string) ($arguments[$arg] ?? ''));
+        foreach (['description', 'color'] as $field) {
+            $value = $this->arg($arguments, $field);
             if ($value !== '') {
                 $payload[$field] = $value;
             }
@@ -285,7 +254,7 @@ final class ZernioAccountsTool extends AbstractZernioTool
     }
 
     /**
-     * @param array<string, mixed> $response
+     * @param  array<string, mixed> $response
      */
     private function formatList(string $label, array $response, string $primaryKey): ToolResult
     {
@@ -293,49 +262,8 @@ final class ZernioAccountsTool extends AbstractZernioTool
         $count = count($items);
         return new ToolResult(
             true,
-            "{$label} ({$count}):\n" . json_encode($items, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+            "{$label} ({$count}):\n" . $this->encode($items),
             ['count' => $count],
         );
-    }
-
-    /**
-     * @param array<string, mixed> $response
-     */
-    private function jsonResult(string $label, array $response): ToolResult
-    {
-        return new ToolResult(true, $label . json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-    }
-
-    /**
-     * @param  array<string, mixed>          $arguments
-     * @param  array<string, string>         $map   tool arg → API query key
-     * @return array<string, scalar|null>
-     */
-    private function stringMap(array $arguments, array $map): array
-    {
-        $out = [];
-        foreach ($map as $arg => $param) {
-            $value = trim((string) ($arguments[$arg] ?? ''));
-            if ($value !== '') {
-                $out[$param] = $value;
-            }
-        }
-        return $out;
-    }
-
-    /**
-     * Trimmed required parameter; returns a failed ToolResult on miss so the
-     * operation short-circuits before any HTTP call.
-     *
-     * @param  array<string, mixed> $arguments
-     * @return string|ToolResult
-     */
-    private function requireParam(array $arguments, string $key, string $error): string|ToolResult
-    {
-        $value = trim((string) ($arguments[$key] ?? ''));
-        if ($value === '') {
-            return new ToolResult(false, $error);
-        }
-        return $value;
     }
 }

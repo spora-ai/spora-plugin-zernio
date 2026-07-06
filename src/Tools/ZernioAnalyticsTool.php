@@ -63,142 +63,110 @@ final class ZernioAnalyticsTool extends AbstractZernioTool
         }
 
         return $this->guard(fn(): ToolResult => match ($this->getOperationName($arguments)) {
-            'follower_analytics'   => $this->followerAnalytics($arguments, $config),
-            'best_time_to_post'    => $this->simpleAccount('Best time to post', '/analytics/best-time', $arguments, $config, requirePlatform: true),
-            'content_decay'        => $this->contentDecay($arguments, $config),
-            'daily_metrics'        => $this->profileRead('Daily metrics', '/analytics/daily-metrics', $arguments, $config),
-            'posting_frequency'    => $this->profileRead('Posting frequency', '/analytics/posting-frequency', $arguments, $config),
-            'account_health'       => $this->accountHealth($arguments, $config),
-            default                => $this->postAnalytics($arguments, $config),
+            'follower_analytics' => $this->followerAnalytics($arguments, $config),
+            'best_time_to_post'  => $this->accountRead('Best time to post', '/analytics/best-time', $arguments, $config, requirePlatform: true),
+            'content_decay'      => $this->contentDecay($arguments, $config),
+            'daily_metrics'      => $this->profileRead('Daily metrics', '/analytics/daily-metrics', $arguments, $config),
+            'posting_frequency'  => $this->profileRead('Posting frequency', '/analytics/posting-frequency', $arguments, $config),
+            'account_health'     => $this->accountHealth($arguments, $config),
+            default              => $this->postAnalytics($arguments, $config),
         });
     }
 
     public function describeAction(array $arguments): string
     {
         return match ($this->getOperationName($arguments)) {
-            'follower_analytics'   => 'Get Zernio follower analytics',
-            'best_time_to_post'    => 'Get best times to post for a Zernio account',
-            'content_decay'        => 'Get content decay for a Zernio post or account',
-            'daily_metrics'        => 'Get cross-platform daily metrics for a Zernio profile',
-            'posting_frequency'    => 'Get posting frequency vs engagement for a Zernio profile',
-            'account_health'       => 'Get Zernio account health snapshot',
-            default                => 'Get Zernio post analytics',
+            'follower_analytics' => 'Get Zernio follower analytics',
+            'best_time_to_post'  => 'Get best times to post for a Zernio account',
+            'content_decay'      => 'Get content decay for a Zernio post or account',
+            'daily_metrics'      => 'Get cross-platform daily metrics for a Zernio profile',
+            'posting_frequency'  => 'Get posting frequency vs engagement for a Zernio profile',
+            'account_health'     => 'Get Zernio account health snapshot',
+            default              => 'Get Zernio post analytics',
         };
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function postAnalytics(array $arguments, ZernioConfig $config): ToolResult
     {
-        $postId = $this->ref($arguments, 'post_id');
+        $postId = $this->arg($arguments, 'post_id');
         if ($postId !== '') {
             $query = ['postId' => $postId];
         } else {
-            $accountId = $this->requireParam($arguments, 'account_id', 'post_analytics requires an account_id (or a post_id for a single post).');
-            if ($accountId instanceof ToolResult) {
-                return $accountId;
+            $query = $this->accountAnalyticsQuery($arguments);
+            if ($query === []) {
+                return new ToolResult(false, 'post_analytics requires an account_id (or a post_id for a single post).');
             }
-            $platform = $this->requireParam($arguments, 'platform', 'post_analytics requires a platform when fetching by account_id.');
-            if ($platform instanceof ToolResult) {
-                return $platform;
-            }
-            $query = ['accountId' => $accountId, 'platform' => $platform];
         }
-        $query = array_merge($query, $this->listFilter($arguments, [
-            'profile_id' => 'profileId',
-            'source'     => 'source',
-        ]));
-        $query['sortBy'] = trim((string) ($arguments['sort_by'] ?? 'date'));
-        $query['order']  = trim((string) ($arguments['order']   ?? 'desc'));
-        $query = array_merge($query, $this->dateRange($arguments));
-        $query['page']  = isset($arguments['page']) ? max(1, (int) $arguments['page']) : 1;
-        $query['limit'] = isset($arguments['limit']) ? max(1, min(100, (int) $arguments['limit'])) : 50;
-
-        $response = $this->client->get('/analytics', $query, $config);
-        return new ToolResult(true, "Post analytics:\n" . $this->encode($response));
+        $query['sortBy'] = $this->arg($arguments, 'sort_by') ?: 'date';
+        $query['order']  = $this->arg($arguments, 'order') ?: 'desc';
+        $query          += $this->stringMap($arguments, ['from_date' => 'fromDate', 'to_date' => 'toDate']);
+        $query['page']   = isset($arguments['page']) ? max(1, (int) $arguments['page']) : 1;
+        $query['limit']  = isset($arguments['limit']) ? max(1, min(100, (int) $arguments['limit'])) : 50;
+        return $this->jsonResult("Post analytics:\n", $this->client->get('/analytics', $query, $config));
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function followerAnalytics(array $arguments, ZernioConfig $config): ToolResult
     {
-        $query = [];
-        $accountIds = $this->ref($arguments, 'account_ids');
-        if ($accountIds !== '') {
-            $query['accountIds'] = $accountIds;
-        }
-        $query = array_merge($query, $this->listFilter($arguments, [
+        $query = $this->stringMap($arguments, [
+            'account_ids' => 'accountIds',
             'profile_id'  => 'profileId',
             'granularity' => 'granularity',
-        ]));
-        $query = array_merge($query, $this->dateRange($arguments));
-
-        $response = $this->client->get('/accounts/follower-stats', $query, $config);
-        return new ToolResult(true, "Follower analytics:\n" . $this->encode($response));
+            'from_date'   => 'fromDate',
+            'to_date'     => 'toDate',
+        ]);
+        return $this->jsonResult("Follower analytics:\n", $this->client->get('/accounts/follower-stats', $query, $config));
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function contentDecay(array $arguments, ZernioConfig $config): ToolResult
     {
-        $accountId = $this->ref($arguments, 'account_id');
-        $postId    = $this->ref($arguments, 'post_id');
-        $platform  = $this->ref($arguments, 'platform');
+        $accountId = $this->arg($arguments, 'account_id');
+        $postId    = $this->arg($arguments, 'post_id');
         if ($accountId === '' && $postId === '') {
             return new ToolResult(false, 'content_decay requires either account_id (with platform) or post_id.');
         }
-        $query = [];
-        if ($accountId !== '') {
-            $query['accountId'] = $accountId;
-        }
-        if ($platform !== '') {
-            $query['platform'] = $platform;
-        }
-        if ($postId !== '') {
-            $query['postId'] = $postId;
-        }
-        $response = $this->client->get('/analytics/content-decay', $query, $config);
-        return new ToolResult(true, "Content decay:\n" . $this->encode($response));
+        $query = $this->stringMap($arguments, ['account_id' => 'accountId', 'post_id' => 'postId', 'platform' => 'platform']);
+        return $this->jsonResult("Content decay:\n", $this->client->get('/analytics/content-decay', $query, $config));
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function accountHealth(array $arguments, ZernioConfig $config): ToolResult
     {
-        $query = $this->listFilter($arguments, [
+        $query = $this->stringMap($arguments, [
             'profile_id' => 'profileId',
             'platform'   => 'platform',
             'status'     => 'status',
         ]);
-        $response = $this->client->get('/accounts/health', $query, $config);
-        return new ToolResult(true, "Account health:\n" . $this->encode($response));
+        return $this->jsonResult("Account health:\n", $this->client->get('/accounts/health', $query, $config));
     }
 
     /**
+     * Account-scoped read: requires account_id, optionally platform.
+     *
      * @param array<string, mixed> $arguments
      */
-    private function simpleAccount(string $label, string $path, array $arguments, ZernioConfig $config, bool $requirePlatform): ToolResult
+    private function accountRead(string $label, string $path, array $arguments, ZernioConfig $config, bool $requirePlatform): ToolResult
     {
         $accountId = $this->requireParam($arguments, 'account_id', "{$this->getOperationName($arguments)} requires an account_id.");
         if ($accountId instanceof ToolResult) {
             return $accountId;
         }
-        $query = ['accountId' => $accountId];
-        $platform = $this->ref($arguments, 'platform');
-        if ($platform !== '') {
-            $query['platform'] = $platform;
-        } elseif ($requirePlatform) {
+        $platform = $this->arg($arguments, 'platform');
+        if ($platform === '' && $requirePlatform) {
             return new ToolResult(false, "{$this->getOperationName($arguments)} requires a platform.");
         }
-        $response = $this->client->get($path, $query, $config);
-        return new ToolResult(true, "{$label}:\n" . $this->encode($response));
+        $query = ['accountId' => $accountId];
+        if ($platform !== '') {
+            $query['platform'] = $platform;
+        }
+        return $this->jsonResult("{$label}:\n", $this->client->get($path, $query, $config));
     }
 
     /**
+     * Profile-scoped read: requires profile_id, plus optional date range.
+     *
      * @param array<string, mixed> $arguments
      */
     private function profileRead(string $label, string $path, array $arguments, ZernioConfig $config): ToolResult
@@ -207,71 +175,24 @@ final class ZernioAnalyticsTool extends AbstractZernioTool
         if ($profileId instanceof ToolResult) {
             return $profileId;
         }
-        $query = ['profileId' => $profileId];
-        $query = array_merge($query, $this->dateRange($arguments));
-        $response = $this->client->get($path, $query, $config);
-        return new ToolResult(true, "{$label}:\n" . $this->encode($response));
+        $query = ['profileId' => $profileId] + $this->stringMap($arguments, ['from_date' => 'fromDate', 'to_date' => 'toDate']);
+        return $this->jsonResult("{$label}:\n", $this->client->get($path, $query, $config));
     }
 
     /**
      * @param  array<string, mixed> $arguments
      * @return array<string, string>
      */
-    private function dateRange(array $arguments): array
+    private function accountAnalyticsQuery(array $arguments): array
     {
-        $query = [];
-        foreach (['from_date' => 'fromDate', 'to_date' => 'toDate'] as $arg => $param) {
-            $value = trim((string) ($arguments[$arg] ?? ''));
-            if ($value !== '') {
-                $query[$param] = $value;
-            }
+        $accountId = $this->requireParam($arguments, 'account_id', 'post_analytics requires an account_id (or a post_id for a single post).');
+        if ($accountId instanceof ToolResult) {
+            return [];
         }
-        return $query;
-    }
-
-    /**
-     * @param  array<string, mixed> $arguments
-     * @param  array<string, string> $map
-     * @return array<string, string>
-     */
-    private function listFilter(array $arguments, array $map): array
-    {
-        $query = [];
-        foreach ($map as $arg => $param) {
-            $value = trim((string) ($arguments[$arg] ?? ''));
-            if ($value !== '') {
-                $query[$param] = $value;
-            }
+        $platform = $this->requireParam($arguments, 'platform', 'post_analytics requires a platform when fetching by account_id.');
+        if ($platform instanceof ToolResult) {
+            return [];
         }
-        return $query;
-    }
-
-    /**
-     * @param  array<string, mixed> $arguments
-     * @return string|ToolResult
-     */
-    private function requireParam(array $arguments, string $key, string $error): string|ToolResult
-    {
-        $value = trim((string) ($arguments[$key] ?? ''));
-        if ($value === '') {
-            return new ToolResult(false, $error);
-        }
-        return $value;
-    }
-
-    /**
-     * @param array<string, mixed> $arguments
-     */
-    private function ref(array $arguments, string $key): string
-    {
-        return trim((string) ($arguments[$key] ?? ''));
-    }
-
-    /**
-     * @param mixed $value
-     */
-    private function encode(mixed $value): string
-    {
-        return (string) json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        return ['accountId' => $accountId, 'platform' => $platform];
     }
 }

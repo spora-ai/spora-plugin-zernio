@@ -2,17 +2,12 @@
 
 declare(strict_types=1);
 
-use Spora\Plugins\Zernio\Support\ZernioClient;
 use Spora\Plugins\Zernio\Tools\ZernioQueueTool;
-use Spora\Services\ToolConfigService;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 function queueTool(HttpClientInterface $http): ZernioQueueTool
 {
-    $config = Mockery::mock(ToolConfigService::class);
-    $config->allows('getEffectiveSettings')->andReturn(['api_key' => 'sk_test']);
-
-    return new ZernioQueueTool($config, new ZernioClient($http));
+    return zernioTool(ZernioQueueTool::class, $http);
 }
 
 it('lists the default queue via GET /queue/slots?profileId', function (): void {

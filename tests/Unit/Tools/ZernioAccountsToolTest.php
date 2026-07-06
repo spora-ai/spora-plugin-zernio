@@ -2,17 +2,12 @@
 
 declare(strict_types=1);
 
-use Spora\Plugins\Zernio\Support\ZernioClient;
 use Spora\Plugins\Zernio\Tools\ZernioAccountsTool;
-use Spora\Services\ToolConfigService;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 function accountsTool(HttpClientInterface $http, array $settings = ['api_key' => 'sk_test']): ZernioAccountsTool
 {
-    $config = Mockery::mock(ToolConfigService::class);
-    $config->allows('getEffectiveSettings')->andReturn($settings);
-
-    return new ZernioAccountsTool($config, new ZernioClient($http));
+    return zernioTool(ZernioAccountsTool::class, $http, $settings);
 }
 
 it('fails with a helpful message when no API key is configured', function (): void {

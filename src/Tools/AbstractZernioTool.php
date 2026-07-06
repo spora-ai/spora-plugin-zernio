@@ -136,4 +136,71 @@ abstract class AbstractZernioTool extends AbstractTool
         }
         return array_values($response);
     }
+
+    /**
+     * Trimmed required parameter; returns a failed ToolResult on miss so the
+     * operation short-circuits before any HTTP call.
+     *
+     * @param  array<string, mixed> $arguments
+     * @return string|ToolResult
+     */
+    protected function requireParam(array $arguments, string $key, string $error): string|ToolResult
+    {
+        $value = trim((string) ($arguments[$key] ?? ''));
+        if ($value === '') {
+            return new ToolResult(false, $error);
+        }
+        return $value;
+    }
+
+    /**
+     * Trimmed optional argument lookup shared by every tool.
+     *
+     * @param array<string, mixed> $arguments
+     */
+    protected function arg(array $arguments, string $key): string
+    {
+        return trim((string) ($arguments[$key] ?? ''));
+    }
+
+    /**
+     * Copy a set of string arguments into a query/payload map, skipping
+     * empty values.
+     *
+     * @param  array<string, mixed>  $arguments
+     * @param  array<string, string> $map       tool-arg => API key
+     * @return array<string, string>
+     */
+    protected function stringMap(array $arguments, array $map): array
+    {
+        $out = [];
+        foreach ($map as $arg => $key) {
+            $value = $this->arg($arguments, $arg);
+            if ($value !== '') {
+                $out[$key] = $value;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Pretty-print an API response for the tool result content.
+     *
+     * @param mixed $value
+     */
+    protected function encode(mixed $value): string
+    {
+        return (string) json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * Wrap an API response in a successful ToolResult that pretty-prints the
+     * JSON. Centralised so the formatting stays consistent across tools.
+     *
+     * @param mixed $response
+     */
+    protected function jsonResult(string $label, mixed $response): ToolResult
+    {
+        return new ToolResult(true, $label . $this->encode($response));
+    }
 }

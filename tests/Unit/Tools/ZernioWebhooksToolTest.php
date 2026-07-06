@@ -2,17 +2,12 @@
 
 declare(strict_types=1);
 
-use Spora\Plugins\Zernio\Support\ZernioClient;
 use Spora\Plugins\Zernio\Tools\ZernioWebhooksTool;
-use Spora\Services\ToolConfigService;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 function webhooksTool(HttpClientInterface $http): ZernioWebhooksTool
 {
-    $config = Mockery::mock(ToolConfigService::class);
-    $config->allows('getEffectiveSettings')->andReturn(['api_key' => 'sk_test']);
-
-    return new ZernioWebhooksTool($config, new ZernioClient($http));
+    return zernioTool(ZernioWebhooksTool::class, $http);
 }
 
 it('lists webhooks via GET /webhooks/settings', function (): void {

@@ -99,17 +99,17 @@ final class ZernioPostTool extends AbstractZernioTool
         }
 
         return $this->guard(fn(): ToolResult => match ($this->getOperationName($arguments)) {
-            'list_posts'            => $this->listPosts($arguments, $config),
-            'get_post'              => $this->getPost($arguments, $config),
-            'update_post'           => $this->updatePost($arguments, $config),
-            'delete_post'           => $this->deletePost($arguments, $config),
-            'retry_post'            => $this->retryPost($arguments, $config),
-            'unpublish_post'        => $this->unpublishPost($arguments, $config),
-            'edit_post'             => $this->editPost($arguments, $config),
-            'update_post_metadata'  => $this->updatePostMetadata($arguments, $config),
-            'sync_external_posts'   => $this->syncExternalPosts($arguments, $config),
-            'bulk_upload'           => $this->bulkUpload($arguments, $config),
-            default                 => $this->createPost($arguments, $config),
+            'list_posts'           => $this->listPosts($arguments, $config),
+            'get_post'             => $this->getPost($arguments, $config),
+            'update_post'          => $this->updatePost($arguments, $config),
+            'delete_post'          => $this->deletePost($arguments, $config),
+            'retry_post'           => $this->retryPost($arguments, $config),
+            'unpublish_post'       => $this->unpublishPost($arguments, $config),
+            'edit_post'            => $this->editPost($arguments, $config),
+            'update_post_metadata' => $this->updatePostMetadata($arguments, $config),
+            'sync_external_posts'  => $this->syncExternalPosts($arguments, $config),
+            'bulk_upload'          => $this->bulkUpload($arguments, $config),
+            default                => $this->createPost($arguments, $config),
         });
     }
 
@@ -117,22 +117,20 @@ final class ZernioPostTool extends AbstractZernioTool
     {
         return match ($this->getOperationName($arguments)) {
             'list_posts'           => 'List Zernio posts',
-            'get_post'             => 'Get Zernio post ' . $this->ref($arguments, 'post_id'),
-            'update_post'          => 'Update Zernio post ' . $this->ref($arguments, 'post_id'),
-            'delete_post'          => 'Delete Zernio post ' . $this->ref($arguments, 'post_id'),
-            'retry_post'           => 'Retry Zernio post ' . $this->ref($arguments, 'post_id'),
-            'unpublish_post'       => 'Unpublish Zernio post ' . $this->ref($arguments, 'post_id') . ' from ' . $this->ref($arguments, 'platform_for_unpublish'),
-            'edit_post'            => 'Edit Zernio post ' . $this->ref($arguments, 'post_id'),
-            'update_post_metadata' => 'Update YouTube metadata for Zernio post ' . $this->ref($arguments, 'post_id'),
-            'sync_external_posts'  => 'Sync external posts for account ' . $this->ref($arguments, 'account_id'),
+            'get_post'             => 'Get Zernio post ' . $this->arg($arguments, 'post_id'),
+            'update_post'          => 'Update Zernio post ' . $this->arg($arguments, 'post_id'),
+            'delete_post'          => 'Delete Zernio post ' . $this->arg($arguments, 'post_id'),
+            'retry_post'           => 'Retry Zernio post ' . $this->arg($arguments, 'post_id'),
+            'unpublish_post'       => 'Unpublish Zernio post ' . $this->arg($arguments, 'post_id') . ' from ' . $this->arg($arguments, 'platform_for_unpublish'),
+            'edit_post'            => 'Edit Zernio post ' . $this->arg($arguments, 'post_id'),
+            'update_post_metadata' => 'Update YouTube metadata for Zernio post ' . $this->arg($arguments, 'post_id'),
+            'sync_external_posts'  => 'Sync external posts for account ' . $this->arg($arguments, 'account_id'),
             'bulk_upload'          => (bool) ($arguments['dry_run'] ?? false) ? 'Dry-run bulk post upload' : 'Bulk upload posts via CSV',
             default                => $this->describeCreate($arguments),
         };
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function createPost(array $arguments, ZernioConfig $config): ToolResult
     {
         $platforms = $this->buildPlatforms($arguments);
@@ -143,10 +141,8 @@ final class ZernioPostTool extends AbstractZernioTool
             return new ToolResult(false, 'create_post requires at least one target platform (account_ids + platform, or platforms[]).');
         }
 
-        $content = trim((string) ($arguments['content'] ?? ''));
-        $hasMedia = !empty($arguments['media_items']);
-        $allCustomContent = $this->everyPlatformHasCustomContent($platforms);
-        if ($content === '' && !$hasMedia && !$allCustomContent) {
+        $content = $this->arg($arguments, 'content');
+        if ($content === '' && !$this->hasMedia($arguments) && !$this->everyPlatformHasCustomContent($platforms)) {
             return new ToolResult(false, 'create_post requires content unless media_items are attached or every platform has customContent.');
         }
 
@@ -154,15 +150,13 @@ final class ZernioPostTool extends AbstractZernioTool
         if ($content !== '') {
             $payload['content'] = $content;
         }
-        foreach (['title' => 'title', 'tags' => 'tags', 'hashtags' => 'hashtags', 'mentions' => 'mentions'] as $arg => $field) {
-            $value = $arguments[$arg] ?? null;
-            if (is_array($value) && $value !== []) {
-                $payload[$field] = array_values($value);
-            } elseif (is_string($value) && trim($value) !== '') {
-                $payload[$field] = $value;
-            }
-        }
-        if (isset($arguments['media_items']) && is_array($arguments['media_items']) && $arguments['media_items'] !== []) {
+        $payload += $this->stringListPayload($arguments, [
+            'title'     => 'title',
+            'tags'      => 'tags',
+            'hashtags'  => 'hashtags',
+            'mentions'  => 'mentions',
+        ]);
+        if ($this->hasMedia($arguments)) {
             $payload['mediaItems'] = array_values($arguments['media_items']);
         }
         $scheduling = $this->schedulingPayload($arguments);
@@ -170,11 +164,11 @@ final class ZernioPostTool extends AbstractZernioTool
             return $scheduling;
         }
         $payload = array_merge($payload, $scheduling);
-        foreach (['recycling' => 'recycling', 'tiktok_settings' => 'tiktokSettings', 'facebook_settings' => 'facebookSettings'] as $arg => $field) {
-            if (isset($arguments[$arg]) && is_array($arguments[$arg])) {
-                $payload[$field] = $arguments[$arg];
-            }
-        }
+        $payload += $this->nestedPayload($arguments, [
+            'recycling'         => 'recycling',
+            'tiktok_settings'   => 'tiktokSettings',
+            'facebook_settings' => 'facebookSettings',
+        ]);
 
         $requestId = $this->newRequestId();
         $response  = $this->client->post('/posts', $payload, $config, ['X-Request-Id' => $requestId]);
@@ -187,29 +181,20 @@ final class ZernioPostTool extends AbstractZernioTool
         );
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function listPosts(array $arguments, ZernioConfig $config): ToolResult
     {
-        $map = [
-            'status'         => 'status',
-            'profile_id'     => 'profileId',
-            'account_id'     => 'accountId',
+        $query = $this->stringMap($arguments, [
+            'status'          => 'status',
+            'profile_id'      => 'profileId',
+            'account_id'      => 'accountId',
             'platform_filter' => 'platform',
-            'date_from'      => 'dateFrom',
-            'date_to'        => 'dateTo',
-            'search'         => 'search',
-            'sort_by'        => 'sortBy',
-            'source'         => 'source',
-        ];
-        $query = [];
-        foreach ($map as $arg => $param) {
-            $value = trim((string) ($arguments[$arg] ?? ''));
-            if ($value !== '') {
-                $query[$param] = $value;
-            }
-        }
+            'date_from'       => 'dateFrom',
+            'date_to'         => 'dateTo',
+            'search'          => 'search',
+            'sort_by'         => 'sortBy',
+            'source'          => 'source',
+        ]);
         if ((bool) ($arguments['include_hidden'] ?? false)) {
             $query['includeHidden'] = true;
         }
@@ -219,75 +204,21 @@ final class ZernioPostTool extends AbstractZernioTool
         if (isset($arguments['limit'])) {
             $query['limit'] = max(1, min(100, (int) $arguments['limit']));
         }
-        $response = $this->client->get('/posts', $query, $config);
-        $items    = $this->listKey($response, 'posts');
-        $count    = count($items);
-
+        $items = $this->listKey($this->client->get('/posts', $query, $config), 'posts');
         return new ToolResult(
             true,
-            "Posts ({$count}):\n" . $this->encode($items),
-            ['count' => $count],
+            'Posts (' . count($items) . "):\n" . $this->encode($items),
+            ['count' => count($items)],
         );
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function getPost(array $arguments, ZernioConfig $config): ToolResult
     {
-        $postId = $this->requireParam($arguments, 'post_id', 'get_post requires a post_id.');
-        if ($postId instanceof ToolResult) {
-            return $postId;
-        }
-        $response = $this->client->get('/posts/' . rawurlencode($postId), [], $config);
-        return new ToolResult(true, $this->encode($response));
+        return $this->getById($arguments, $config, 'get_post', '/posts/');
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
-    private function updatePost(array $arguments, ZernioConfig $config): ToolResult
-    {
-        $postId = $this->requireParam($arguments, 'post_id', 'update_post requires a post_id.');
-        if ($postId instanceof ToolResult) {
-            return $postId;
-        }
-
-        $payload = [];
-        foreach (['content' => 'content', 'title' => 'title'] as $arg => $field) {
-            $value = $arguments[$arg] ?? null;
-            if (is_string($value)) {
-                $trimmed = trim($value);
-                if ($trimmed !== '') {
-                    $payload[$field] = $trimmed;
-                }
-            }
-        }
-        foreach (['tags' => 'tags', 'hashtags' => 'hashtags', 'mentions' => 'mentions'] as $arg => $field) {
-            if (isset($arguments[$arg]) && is_array($arguments[$arg])) {
-                $payload[$field] = array_values($arguments[$arg]);
-            }
-        }
-        $payload += $this->schedulingPayload($arguments);
-        if (array_key_exists('is_draft', $arguments)) {
-            $payload['isDraft'] = (bool) $arguments['is_draft'];
-        }
-        if (isset($arguments['media_items']) && is_array($arguments['media_items'])) {
-            $payload['mediaItems'] = array_values($arguments['media_items']);
-        }
-        if (isset($arguments['recycling']) && is_array($arguments['recycling'])) {
-            $payload['recycling'] = $arguments['recycling'];
-        }
-        if ($payload === []) {
-            return new ToolResult(false, 'update_post requires at least one of content, title, tags, hashtags, mentions, scheduled_for, is_draft, media_items, recycling.');
-        }
-        $response = $this->client->put('/posts/' . rawurlencode($postId), $payload, $config);
-        return new ToolResult(true, "Updated post:\n" . $this->encode($response));
-    }
-
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function deletePost(array $arguments, ZernioConfig $config): ToolResult
     {
         $postId = $this->requireParam($arguments, 'post_id', 'delete_post requires a post_id.');
@@ -298,9 +229,7 @@ final class ZernioPostTool extends AbstractZernioTool
         return new ToolResult(true, "Deleted post {$postId}.", ['post_id' => $postId]);
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function retryPost(array $arguments, ZernioConfig $config): ToolResult
     {
         $postId = $this->requireParam($arguments, 'post_id', 'retry_post requires a post_id.');
@@ -308,12 +237,47 @@ final class ZernioPostTool extends AbstractZernioTool
             return $postId;
         }
         $response = $this->client->post('/posts/' . rawurlencode($postId) . '/retry', [], $config);
-        return new ToolResult(true, "Retried post:\n" . $this->encode($response));
+        return $this->jsonResult("Retried post:\n", $response);
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
+    private function updatePost(array $arguments, ZernioConfig $config): ToolResult
+    {
+        $postId = $this->requireParam($arguments, 'post_id', 'update_post requires a post_id.');
+        if ($postId instanceof ToolResult) {
+            return $postId;
+        }
+        $payload = [];
+        foreach (['content' => 'content', 'title' => 'title'] as $arg => $field) {
+            $value = $arguments[$arg] ?? null;
+            if (is_string($value)) {
+                $trimmed = trim($value);
+                if ($trimmed !== '') {
+                    $payload[$field] = $trimmed;
+                }
+            }
+        }
+        $payload += $this->stringListPayload($arguments, ['tags' => 'tags', 'hashtags' => 'hashtags', 'mentions' => 'mentions']);
+        $scheduling = $this->schedulingPayload($arguments);
+        if ($scheduling instanceof ToolResult) {
+            return $scheduling;
+        }
+        $payload = array_merge($payload, $scheduling);
+        if (array_key_exists('is_draft', $arguments)) {
+            $payload['isDraft'] = (bool) $arguments['is_draft'];
+        }
+        if ($this->hasMedia($arguments)) {
+            $payload['mediaItems'] = array_values($arguments['media_items']);
+        }
+        $payload += $this->nestedPayload($arguments, ['recycling' => 'recycling']);
+        if ($payload === []) {
+            return new ToolResult(false, 'update_post requires at least one of content, title, tags, hashtags, mentions, scheduled_for, is_draft, media_items, recycling.');
+        }
+        $response = $this->client->put('/posts/' . rawurlencode($postId), $payload, $config);
+        return $this->jsonResult("Updated post:\n", $response);
+    }
+
+    /** @param array<string, mixed> $arguments */
     private function unpublishPost(array $arguments, ZernioConfig $config): ToolResult
     {
         $postId = $this->requireParam($arguments, 'post_id', 'unpublish_post requires a post_id.');
@@ -325,15 +289,13 @@ final class ZernioPostTool extends AbstractZernioTool
             return $platform;
         }
         $response = $this->client->post('/posts/' . rawurlencode($postId) . '/unpublish', ['platform' => $platform], $config);
-        return new ToolResult(true, "Unpublished post from {$platform}:\n" . $this->encode($response));
+        return $this->jsonResult("Unpublished post from {$platform}:\n", $response);
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function editPost(array $arguments, ZernioConfig $config): ToolResult
     {
-        $postId = $this->requireParam($arguments, 'post_id', 'edit_post requires a post_id.');
+        $postId  = $this->requireParam($arguments, 'post_id', 'edit_post requires a post_id.');
         if ($postId instanceof ToolResult) {
             return $postId;
         }
@@ -345,17 +307,15 @@ final class ZernioPostTool extends AbstractZernioTool
             'platform' => 'twitter',
             'content'  => $content,
         ], $config);
-        return new ToolResult(true, "Edited post:\n" . $this->encode($response));
+        return $this->jsonResult("Edited post:\n", $response);
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function updatePostMetadata(array $arguments, ZernioConfig $config): ToolResult
     {
-        $postId   = $this->ref($arguments, 'post_id');
-        $videoId  = $this->ref($arguments, 'video_id');
-        $accountId = $this->ref($arguments, 'account_id');
+        $postId    = $this->arg($arguments, 'post_id');
+        $videoId   = $this->arg($arguments, 'video_id');
+        $accountId = $this->arg($arguments, 'account_id');
         if ($postId === '' && ($videoId === '' || $accountId === '')) {
             return new ToolResult(false, 'update_post_metadata requires either a post_id or both video_id and account_id.');
         }
@@ -369,18 +329,14 @@ final class ZernioPostTool extends AbstractZernioTool
         if ($accountId !== '') {
             $payload['accountId'] = $accountId;
         }
-        foreach ([
-            'yt_title'                  => 'title',
-            'yt_description'            => 'description',
-            'yt_category_id'            => 'categoryId',
-            'yt_privacy_status'         => 'privacyStatus',
-            'yt_thumbnail_url'          => 'thumbnailUrl',
-        ] as $arg => $field) {
-            $value = trim((string) ($arguments[$arg] ?? ''));
-            if ($value !== '') {
-                $payload[$field] = $value;
-            }
-        }
+        $payload += $this->stringMap($arguments, [
+            'yt_title'           => 'title',
+            'yt_description'     => 'description',
+            'yt_category_id'     => 'categoryId',
+            'yt_privacy_status'  => 'privacyStatus',
+            'yt_thumbnail_url'   => 'thumbnailUrl',
+            'yt_playlist_id'     => 'playlistId',
+        ]);
         if (isset($arguments['yt_tags']) && is_array($arguments['yt_tags'])) {
             $payload['tags'] = array_values($arguments['yt_tags']);
         }
@@ -390,40 +346,27 @@ final class ZernioPostTool extends AbstractZernioTool
         if (array_key_exists('yt_contains_synthetic_media', $arguments)) {
             $payload['containsSyntheticMedia'] = (bool) $arguments['yt_contains_synthetic_media'];
         }
-        $playlistId = trim((string) ($arguments['yt_playlist_id'] ?? ''));
-        if ($playlistId !== '') {
-            $payload['playlistId'] = $playlistId;
-        }
-        $path = $postId !== ''
-            ? '/posts/' . rawurlencode($postId) . '/update-metadata'
-            : '/posts/update-metadata';
+        $path = $postId !== '' ? '/posts/' . rawurlencode($postId) . '/update-metadata' : '/posts/update-metadata';
         $response = $this->client->post($path, $payload, $config);
-        return new ToolResult(true, "Updated YouTube metadata:\n" . $this->encode($response));
+        return $this->jsonResult("Updated YouTube metadata:\n", $response);
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function syncExternalPosts(array $arguments, ZernioConfig $config): ToolResult
     {
         $accountId = $this->requireParam($arguments, 'account_id', 'sync_external_posts requires an account_id.');
         if ($accountId instanceof ToolResult) {
             return $accountId;
         }
-        $payload = ['accountId' => $accountId];
-        foreach (['external_url' => 'url', 'external_post_id' => 'postId'] as $arg => $field) {
-            $value = trim((string) ($arguments[$arg] ?? ''));
-            if ($value !== '') {
-                $payload[$field] = $value;
-            }
-        }
+        $payload = ['accountId' => $accountId] + $this->stringMap($arguments, [
+            'external_url'     => 'url',
+            'external_post_id' => 'postId',
+        ]);
         $response = $this->client->post('/posts/sync-external', $payload, $config);
-        return new ToolResult(true, "Synced external posts:\n" . $this->encode($response));
+        return $this->jsonResult("Synced external posts:\n", $response);
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function bulkUpload(array $arguments, ZernioConfig $config): ToolResult
     {
         $csv = (string) ($arguments['csv_content'] ?? '');
@@ -431,59 +374,174 @@ final class ZernioPostTool extends AbstractZernioTool
             return new ToolResult(false, 'bulk_upload requires csv_content.');
         }
         $dryRun = (bool) ($arguments['dry_run'] ?? false);
-        $path   = '/posts/bulk-upload' . ($dryRun ? '?dryRun=true' : '');
-        $body   = [
-            'headers' => ['Content-Type' => 'text/csv'],
-            'body'    => $csv,
-        ];
-        $response = $this->client->post($path, $body, $config);
-        return new ToolResult(true, "Bulk upload:\n" . $this->encode($response));
+        $response = $this->client->post(
+            '/posts/bulk-upload' . ($dryRun ? '?dryRun=true' : ''),
+            ['headers' => ['Content-Type' => 'text/csv'], 'body' => $csv],
+            $config,
+        );
+        return $this->jsonResult("Bulk upload:\n", $response);
     }
 
     /**
-     * @param array<string, mixed> $arguments
+     * Build the list of `platforms` for create_post. Accepts the explicit
+     * `platforms` array, or `account_ids` + a single `platform` for convenience.
+     *
+     * @param  array<string, mixed>          $arguments
      * @return list<array<string, mixed>>|ToolResult
      */
     private function buildPlatforms(array $arguments): array|ToolResult
     {
         if (isset($arguments['platforms']) && is_array($arguments['platforms']) && $arguments['platforms'] !== []) {
-            $out = [];
-            foreach ($arguments['platforms'] as $entry) {
-                if (!is_array($entry)) {
-                    return new ToolResult(false, 'Each entry in `platforms` must be an object with at least {platform, accountId}.');
-                }
-                $platform = trim((string) ($entry['platform'] ?? ''));
-                $accountId = trim((string) ($entry['accountId'] ?? $entry['account_id'] ?? ''));
-                if ($platform === '' || $accountId === '') {
-                    return new ToolResult(false, 'Each entry in `platforms` must have both `platform` and `accountId`.');
-                }
-                $row = ['platform' => $platform, 'accountId' => $accountId];
-                foreach (['customContent' => 'customContent', 'customMedia' => 'customMedia', 'scheduledFor' => 'scheduledFor', 'platformSpecificData' => 'platformSpecificData'] as $k => $alias) {
-                    if (isset($entry[$k]) || isset($entry[$alias])) {
-                        $row[$k] = $entry[$k] ?? $entry[$alias];
-                    }
-                }
-                $out[] = $row;
-            }
-            return $out;
+            return $this->parseExplicitPlatforms($arguments['platforms']);
         }
-
         $ids = $arguments['account_ids'] ?? null;
         if (!is_array($ids) || $ids === []) {
             return [];
         }
-        $platform = trim((string) ($arguments['platform'] ?? ''));
+        $platform = $this->arg($arguments, 'platform');
         if ($platform === '') {
             return new ToolResult(false, 'create_post with account_ids requires a `platform` name (e.g. "twitter"). Use `platforms` instead for per-platform targets.');
         }
         $out = [];
-        foreach ($ids as $id) {
-            if (!is_string($id) || trim($id) === '') {
-                continue;
-            }
-            $out[] = ['platform' => $platform, 'accountId' => trim($id)];
+        foreach ($this->stringList($ids) as $id) {
+            $out[] = ['platform' => $platform, 'accountId' => $id];
         }
         return $out;
+    }
+
+    /**
+     * @param  list<mixed> $entries
+     * @return list<array<string, mixed>>|ToolResult
+     */
+    private function parseExplicitPlatforms(array $entries): array|ToolResult
+    {
+        $out = [];
+        foreach ($entries as $entry) {
+            if (!is_array($entry)) {
+                return new ToolResult(false, 'Each entry in `platforms` must be an object with at least {platform, accountId}.');
+            }
+            $platform  = $this->arg($entry, 'platform');
+            $accountId = $this->arg($entry, 'accountId') !== ''
+                ? $this->arg($entry, 'accountId')
+                : $this->arg($entry, 'account_id');
+            if ($platform === '' || $accountId === '') {
+                return new ToolResult(false, 'Each entry in `platforms` must have both `platform` and `accountId`.');
+            }
+            $row = ['platform' => $platform, 'accountId' => $accountId];
+            foreach ([
+                'customContent'         => 'customContent',
+                'customMedia'           => 'customMedia',
+                'scheduledFor'          => 'scheduledFor',
+                'platformSpecificData'  => 'platformSpecificData',
+            ] as $key => $_) {
+                if (isset($entry[$key])) {
+                    $row[$key] = $entry[$key];
+                }
+            }
+            $out[] = $row;
+        }
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     * @return array<string, mixed>
+     */
+    private function stringListPayload(array $arguments, array $map): array
+    {
+        $out = [];
+        foreach ($map as $arg => $field) {
+            $value = $arguments[$arg] ?? null;
+            if (is_array($value) && $value !== []) {
+                $out[$field] = array_values($value);
+            } elseif (is_string($value) && trim($value) !== '') {
+                $out[$field] = $value;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Pass-through for nested object payloads (recycling, tiktokSettings, …)
+     * only when the agent actually passed them.
+     *
+     * @param  array<string, mixed> $arguments
+     * @param  array<string, string> $map
+     * @return array<string, mixed>
+     */
+    private function nestedPayload(array $arguments, array $map): array
+    {
+        $out = [];
+        foreach ($map as $arg => $field) {
+            if (isset($arguments[$arg]) && is_array($arguments[$arg])) {
+                $out[$field] = $arguments[$arg];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Resolve the publish/schedule/queue/draft fields, or a failed
+     * ToolResult when scheduling is requested without a timezone.
+     *
+     * @param  array<string, mixed> $arguments
+     * @return array<string, mixed>|ToolResult
+     */
+    private function schedulingPayload(array $arguments): array|ToolResult
+    {
+        if ((bool) ($arguments['publish_now'] ?? false)) {
+            return ['publishNow' => true];
+        }
+        $queued = $this->arg($arguments, 'queued_from_profile');
+        if ($queued !== '') {
+            $payload = ['queuedFromProfile' => $queued];
+            $queueId = $this->arg($arguments, 'queue_id');
+            if ($queueId !== '') {
+                $payload['queueId'] = $queueId;
+            }
+            return $payload;
+        }
+        $scheduledFor = $this->arg($arguments, 'scheduled_for');
+        if ($scheduledFor === '') {
+            if (array_key_exists('is_draft', $arguments) && (bool) $arguments['is_draft']) {
+                return ['isDraft' => true];
+            }
+            return [];
+        }
+        $timezone = $this->arg($arguments, 'timezone');
+        if ($timezone === '') {
+            return new ToolResult(false, 'Scheduling a post requires a timezone alongside scheduled_for.');
+        }
+        return ['scheduledFor' => $scheduledFor, 'timezone' => $timezone];
+    }
+
+    /** @param array<string, mixed> $arguments */
+    private function modeLabel(array $arguments): string
+    {
+        if ((bool) ($arguments['publish_now'] ?? false)) {
+            return 'published';
+        }
+        if ($this->arg($arguments, 'queued_from_profile') !== '') {
+            return 'queue-scheduled';
+        }
+        if ($this->arg($arguments, 'scheduled_for') !== '') {
+            return 'scheduled';
+        }
+        return 'drafted';
+    }
+
+    /** @param array<string, mixed> $arguments */
+    private function describeCreate(array $arguments): string
+    {
+        $platforms = $this->buildPlatforms($arguments);
+        $count = is_array($platforms) ? count($platforms) : 0;
+        return ucfirst($this->modeLabel($arguments)) . " a post to {$count} account(s)";
+    }
+
+    /** @param array<string, mixed> $arguments */
+    private function hasMedia(array $arguments): bool
+    {
+        return isset($arguments['media_items']) && is_array($arguments['media_items']) && $arguments['media_items'] !== [];
     }
 
     /**
@@ -503,62 +561,37 @@ final class ZernioPostTool extends AbstractZernioTool
     }
 
     /**
-     * @param  array<string, mixed> $arguments
-     * @return array<string, mixed>|ToolResult
+     * @param  array<string, mixed>  $arguments
+     * @param  ZernioConfig          $config
+     * @return ToolResult
      */
-    private function schedulingPayload(array $arguments): array|ToolResult
+    private function getById(array $arguments, ZernioConfig $config, string $operation, string $pathPrefix): ToolResult
     {
-        if ((bool) ($arguments['publish_now'] ?? false)) {
-            return ['publishNow' => true];
+        $id = $this->requireParam($arguments, 'post_id', $operation . ' requires a post_id.');
+        if ($id instanceof ToolResult) {
+            return $id;
         }
-        $queued = trim((string) ($arguments['queued_from_profile'] ?? ''));
-        if ($queued !== '') {
-            $payload = ['queuedFromProfile' => $queued];
-            $queueId = trim((string) ($arguments['queue_id'] ?? ''));
-            if ($queueId !== '') {
-                $payload['queueId'] = $queueId;
-            }
-            return $payload;
-        }
-        $scheduledFor = trim((string) ($arguments['scheduled_for'] ?? ''));
-        if ($scheduledFor === '') {
-            if (array_key_exists('is_draft', $arguments) && (bool) $arguments['is_draft']) {
-                return ['isDraft' => true];
-            }
+        $response = $this->client->get($pathPrefix . rawurlencode($id), [], $config);
+        return $this->jsonResult('', $response);
+    }
+
+    /**
+     * Coerce a tool argument into a clean list of non-empty strings.
+     *
+     * @return list<string>
+     */
+    private function stringList(mixed $value): array
+    {
+        if (!is_array($value)) {
             return [];
         }
-        $timezone = trim((string) ($arguments['timezone'] ?? ''));
-        if ($timezone === '') {
-            return new ToolResult(false, 'Scheduling a post requires a timezone alongside scheduled_for.');
+        $out = [];
+        foreach ($value as $item) {
+            if (is_string($item) && trim($item) !== '') {
+                $out[] = trim($item);
+            }
         }
-        return ['scheduledFor' => $scheduledFor, 'timezone' => $timezone];
-    }
-
-    /**
-     * @param array<string, mixed> $arguments
-     */
-    private function modeLabel(array $arguments): string
-    {
-        if ((bool) ($arguments['publish_now'] ?? false)) {
-            return 'published';
-        }
-        if (trim((string) ($arguments['queued_from_profile'] ?? '')) !== '') {
-            return 'queue-scheduled';
-        }
-        if (trim((string) ($arguments['scheduled_for'] ?? '')) !== '') {
-            return 'scheduled';
-        }
-        return 'drafted';
-    }
-
-    /**
-     * @param array<string, mixed> $arguments
-     */
-    private function describeCreate(array $arguments): string
-    {
-        $platforms = $this->buildPlatforms($arguments);
-        $count = is_array($platforms) ? count($platforms) : 0;
-        return ucfirst($this->modeLabel($arguments)) . " a post to {$count} account(s)";
+        return $out;
     }
 
     private function newRequestId(): string
@@ -576,34 +609,5 @@ final class ZernioPostTool extends AbstractZernioTool
             substr($hex, 16, 4),
             substr($hex, 20, 12),
         );
-    }
-
-    /**
-     * @param  array<string, mixed>  $arguments
-     * @return string|ToolResult
-     */
-    private function requireParam(array $arguments, string $key, string $error): string|ToolResult
-    {
-        $value = trim((string) ($arguments[$key] ?? ''));
-        if ($value === '') {
-            return new ToolResult(false, $error);
-        }
-        return $value;
-    }
-
-    /**
-     * @param array<string, mixed> $arguments
-     */
-    private function ref(array $arguments, string $key): string
-    {
-        return trim((string) ($arguments[$key] ?? ''));
-    }
-
-    /**
-     * @param mixed $value
-     */
-    private function encode(mixed $value): string
-    {
-        return (string) json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     }
 }

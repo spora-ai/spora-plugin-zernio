@@ -57,12 +57,12 @@ final class ZernioWebhooksTool extends AbstractZernioTool
         }
 
         return $this->guard(fn(): ToolResult => match ($this->getOperationName($arguments)) {
-            'create_webhook'    => $this->createWebhook($arguments, $config),
-            'update_webhook'    => $this->updateWebhook($arguments, $config),
-            'delete_webhook'    => $this->deleteWebhook($arguments, $config),
-            'get_webhook_logs'  => $this->webhookLogs($arguments, $config),
-            'test_webhook'      => $this->testWebhook($arguments, $config),
-            default             => $this->listWebhooks($config),
+            'create_webhook'   => $this->createWebhook($arguments, $config),
+            'update_webhook'   => $this->updateWebhook($arguments, $config),
+            'delete_webhook'   => $this->deleteWebhook($arguments, $config),
+            'get_webhook_logs' => $this->webhookLogs($arguments, $config),
+            'test_webhook'     => $this->testWebhook($arguments, $config),
+            default            => $this->jsonResult("Webhooks:\n", $this->client->get('/webhooks/settings', [], $config)),
         });
     }
 
@@ -70,36 +70,25 @@ final class ZernioWebhooksTool extends AbstractZernioTool
     {
         return match ($this->getOperationName($arguments)) {
             'create_webhook'   => 'Create a Zernio webhook',
-            'update_webhook'   => 'Update Zernio webhook ' . $this->ref($arguments, 'webhook_id'),
-            'delete_webhook'   => 'Delete Zernio webhook ' . $this->ref($arguments, 'webhook_id'),
+            'update_webhook'   => 'Update Zernio webhook ' . $this->arg($arguments, 'webhook_id'),
+            'delete_webhook'   => 'Delete Zernio webhook ' . $this->arg($arguments, 'webhook_id'),
             'get_webhook_logs' => 'Get Zernio webhook delivery logs',
             'test_webhook'     => 'Send a test Zernio webhook event',
             default            => 'List Zernio webhooks',
         };
     }
 
-    private function listWebhooks(ZernioConfig $config): ToolResult
-    {
-        $response = $this->client->get('/webhooks/settings', [], $config);
-        return new ToolResult(true, "Webhooks:\n" . $this->encode($response));
-    }
-
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function createWebhook(array $arguments, ZernioConfig $config): ToolResult
     {
         $payload = $this->webhookWritePayload($arguments, requireAll: true);
         if ($payload instanceof ToolResult) {
             return $payload;
         }
-        $response = $this->client->post('/webhooks/settings', $payload, $config);
-        return new ToolResult(true, "Created webhook:\n" . $this->encode($response));
+        return $this->jsonResult("Created webhook:\n", $this->client->post('/webhooks/settings', $payload, $config));
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function updateWebhook(array $arguments, ZernioConfig $config): ToolResult
     {
         $id = $this->requireParam($arguments, 'webhook_id', 'update_webhook requires a webhook_id.');
@@ -111,13 +100,10 @@ final class ZernioWebhooksTool extends AbstractZernioTool
             return $payload;
         }
         $payload['_id'] = $id;
-        $response = $this->client->put('/webhooks/settings', $payload, $config);
-        return new ToolResult(true, "Updated webhook:\n" . $this->encode($response));
+        return $this->jsonResult("Updated webhook:\n", $this->client->put('/webhooks/settings', $payload, $config));
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function deleteWebhook(array $arguments, ZernioConfig $config): ToolResult
     {
         $id = $this->requireParam($arguments, 'webhook_id', 'delete_webhook requires a webhook_id.');
@@ -128,38 +114,26 @@ final class ZernioWebhooksTool extends AbstractZernioTool
         return new ToolResult(true, "Deleted webhook {$id}.", ['webhook_id' => $id]);
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function webhookLogs(array $arguments, ZernioConfig $config): ToolResult
     {
-        $query = [];
-        $id = $this->ref($arguments, 'webhook_id');
-        if ($id !== '') {
-            $query['webhookId'] = $id;
-        }
-        foreach (['from_date' => 'fromDate', 'to_date' => 'toDate'] as $arg => $param) {
-            $value = trim((string) ($arguments[$arg] ?? ''));
-            if ($value !== '') {
-                $query[$param] = $value;
-            }
-        }
-        $response = $this->client->get('/webhooks/logs', $query, $config);
-        return new ToolResult(true, "Webhook logs:\n" . $this->encode($response));
+        $query = $this->stringMap($arguments, [
+            'webhook_id' => 'webhookId',
+            'from_date'  => 'fromDate',
+            'to_date'    => 'toDate',
+        ]);
+        return $this->jsonResult("Webhook logs:\n", $this->client->get('/webhooks/logs', $query, $config));
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function testWebhook(array $arguments, ZernioConfig $config): ToolResult
     {
         $url   = $this->requireParam($arguments, 'url', 'test_webhook requires a url.');
         if ($url instanceof ToolResult) {
             return $url;
         }
-        $event = $this->ref($arguments, 'event_name') ?: 'webhook.test';
-        $response = $this->client->post('/webhooks/test', ['url' => $url, 'event' => $event], $config);
-        return new ToolResult(true, "Test fired:\n" . $this->encode($response));
+        $event = $this->arg($arguments, 'event_name') ?: 'webhook.test';
+        return $this->jsonResult("Test fired:\n", $this->client->post('/webhooks/test', ['url' => $url, 'event' => $event], $config));
     }
 
     /**
@@ -168,13 +142,11 @@ final class ZernioWebhooksTool extends AbstractZernioTool
      */
     private function webhookWritePayload(array $arguments, bool $requireAll): array|ToolResult
     {
-        $payload = [];
-        foreach (['name' => 'name', 'url' => 'url', 'secret' => 'secret'] as $arg => $field) {
-            $value = trim((string) ($arguments[$arg] ?? ''));
-            if ($value !== '') {
-                $payload[$field] = $value;
-            }
-        }
+        $payload = $this->stringMap($arguments, [
+            'name'   => 'name',
+            'url'    => 'url',
+            'secret' => 'secret',
+        ]);
         if (isset($arguments['events']) && is_array($arguments['events']) && $arguments['events'] !== []) {
             $payload['events'] = array_values($arguments['events']);
         }
@@ -193,37 +165,6 @@ final class ZernioWebhooksTool extends AbstractZernioTool
                 }
             }
         }
-        // isActive is always defaulted to true, so the payload is never empty
-        // for an update. create_webhook early-returns above for missing fields.
         return $payload;
-    }
-
-    /**
-     * @param  array<string, mixed> $arguments
-     * @return string|ToolResult
-     */
-    private function requireParam(array $arguments, string $key, string $error): string|ToolResult
-    {
-        $value = trim((string) ($arguments[$key] ?? ''));
-        if ($value === '') {
-            return new ToolResult(false, $error);
-        }
-        return $value;
-    }
-
-    /**
-     * @param array<string, mixed> $arguments
-     */
-    private function ref(array $arguments, string $key): string
-    {
-        return trim((string) ($arguments[$key] ?? ''));
-    }
-
-    /**
-     * @param mixed $value
-     */
-    private function encode(mixed $value): string
-    {
-        return (string) json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     }
 }

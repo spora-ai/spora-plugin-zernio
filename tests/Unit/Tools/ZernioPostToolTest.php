@@ -2,17 +2,12 @@
 
 declare(strict_types=1);
 
-use Spora\Plugins\Zernio\Support\ZernioClient;
 use Spora\Plugins\Zernio\Tools\ZernioPostTool;
-use Spora\Services\ToolConfigService;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 function postTool(HttpClientInterface $http): ZernioPostTool
 {
-    $config = Mockery::mock(ToolConfigService::class);
-    $config->allows('getEffectiveSettings')->andReturn(['api_key' => 'sk_test']);
-
-    return new ZernioPostTool($config, new ZernioClient($http));
+    return zernioTool(ZernioPostTool::class, $http);
 }
 
 // ---------------------------------------------------------------------------

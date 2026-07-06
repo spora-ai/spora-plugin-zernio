@@ -63,9 +63,7 @@ final class ZernioMediaTool extends AbstractZernioTool
         };
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function presign(array $arguments, ZernioConfig $config): ToolResult
     {
         $filename    = $this->requireParam($arguments, 'filename', 'presign_media requires a filename.');
@@ -80,13 +78,10 @@ final class ZernioMediaTool extends AbstractZernioTool
         if (isset($arguments['size']) && (int) $arguments['size'] > 0) {
             $payload['size'] = (int) $arguments['size'];
         }
-        $response = $this->client->post('/media/presign', $payload, $config);
-        return new ToolResult(true, "Presigned URL:\n" . $this->encode($response));
+        return $this->jsonResult("Presigned URL:\n", $this->client->post('/media/presign', $payload, $config));
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function uploadDirect(array $arguments, ZernioConfig $config): ToolResult
     {
         $filename    = $this->requireParam($arguments, 'filename', 'upload_media requires a filename.');
@@ -105,33 +100,11 @@ final class ZernioMediaTool extends AbstractZernioTool
         if ($bytes === false) {
             return new ToolResult(false, 'upload_media `content` is not valid base64.');
         }
-        $payload = [
+        $response = $this->client->post('/media/upload-direct', [
             'filename'    => $filename,
             'contentType' => $contentType,
             'data'        => base64_encode($bytes),
-        ];
-        $response = $this->client->post('/media/upload-direct', $payload, $config);
-        return new ToolResult(true, "Uploaded media:\n" . $this->encode($response));
-    }
-
-    /**
-     * @param  array<string, mixed> $arguments
-     * @return string|ToolResult
-     */
-    private function requireParam(array $arguments, string $key, string $error): string|ToolResult
-    {
-        $value = trim((string) ($arguments[$key] ?? ''));
-        if ($value === '') {
-            return new ToolResult(false, $error);
-        }
-        return $value;
-    }
-
-    /**
-     * @param mixed $value
-     */
-    private function encode(mixed $value): string
-    {
-        return (string) json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        ], $config);
+        return $this->jsonResult("Uploaded media:\n", $response);
     }
 }

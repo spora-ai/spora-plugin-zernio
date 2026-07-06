@@ -2,17 +2,12 @@
 
 declare(strict_types=1);
 
-use Spora\Plugins\Zernio\Support\ZernioClient;
 use Spora\Plugins\Zernio\Tools\ZernioMediaTool;
-use Spora\Services\ToolConfigService;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 function mediaTool(HttpClientInterface $http): ZernioMediaTool
 {
-    $config = Mockery::mock(ToolConfigService::class);
-    $config->allows('getEffectiveSettings')->andReturn(['api_key' => 'sk_test']);
-
-    return new ZernioMediaTool($config, new ZernioClient($http));
+    return zernioTool(ZernioMediaTool::class, $http);
 }
 
 it('fetches a presigned URL via POST /media/presign', function (): void {

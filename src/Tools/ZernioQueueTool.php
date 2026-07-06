@@ -62,8 +62,8 @@ final class ZernioQueueTool extends AbstractZernioTool
         }
 
         return $this->guard(fn(): ToolResult => match ($this->getOperationName($arguments)) {
-            'preview_queue' => $this->previewQueue($arguments, $config),
-            'next_slot'     => $this->nextSlot($arguments, $config),
+            'preview_queue' => $this->readPath('Queue preview', '/queue/preview', $arguments, $config),
+            'next_slot'     => $this->readPath('Next slot', '/queue/next-slot', $arguments, $config),
             'create_slot'   => $this->createSlot($arguments, $config),
             'update_slot'   => $this->updateSlot($arguments, $config),
             'delete_slot'   => $this->deleteSlot($arguments, $config),
@@ -73,8 +73,8 @@ final class ZernioQueueTool extends AbstractZernioTool
 
     public function describeAction(array $arguments): string
     {
-        $profile = $this->ref($arguments, 'profile_id');
-        $queue   = $this->ref($arguments, 'queue_id');
+        $profile = $this->arg($arguments, 'profile_id');
+        $queue   = $this->arg($arguments, 'queue_id');
         return match ($this->getOperationName($arguments)) {
             'preview_queue'  => "Preview Zernio queue for profile {$profile}",
             'next_slot'      => "Get next Zernio queue slot for profile {$profile}",
@@ -85,9 +85,7 @@ final class ZernioQueueTool extends AbstractZernioTool
         };
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function listSlots(array $arguments, ZernioConfig $config): ToolResult
     {
         $profileId = $this->requireParam($arguments, 'profile_id', 'list_slots requires a profile_id.');
@@ -95,59 +93,35 @@ final class ZernioQueueTool extends AbstractZernioTool
             return $profileId;
         }
         $query = ['profileId' => $profileId];
-        $queueId = $this->ref($arguments, 'queue_id');
+        $queueId = $this->arg($arguments, 'queue_id');
         if ($queueId !== '') {
             $query['queueId'] = $queueId;
         }
         if ((bool) ($arguments['all'] ?? false)) {
             $query['all'] = 'true';
         }
-        $response = $this->client->get(self::SLOTS_PATH, $query, $config);
-        return $this->renderQueues($response);
+        return $this->renderSlots($this->client->get(self::SLOTS_PATH, $query, $config));
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
-    private function previewQueue(array $arguments, ZernioConfig $config): ToolResult
+    /** @param array<string, mixed> $arguments */
+    private function readPath(string $label, string $path, array $arguments, ZernioConfig $config): ToolResult
     {
-        $profileId = $this->requireParam($arguments, 'profile_id', 'preview_queue requires a profile_id.');
+        $profileId = $this->requireParam($arguments, 'profile_id', "{$this->getOperationName($arguments)} requires a profile_id.");
         if ($profileId instanceof ToolResult) {
             return $profileId;
         }
         $query = ['profileId' => $profileId];
-        $queueId = $this->ref($arguments, 'queue_id');
+        $queueId = $this->arg($arguments, 'queue_id');
         if ($queueId !== '') {
             $query['queueId'] = $queueId;
         }
         if (isset($arguments['count'])) {
             $query['count'] = max(1, min(100, (int) $arguments['count']));
         }
-        $response = $this->client->get('/queue/preview', $query, $config);
-        return new ToolResult(true, "Queue preview:\n" . $this->encode($response));
+        return $this->jsonResult("{$label}:\n", $this->client->get($path, $query, $config));
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
-    private function nextSlot(array $arguments, ZernioConfig $config): ToolResult
-    {
-        $profileId = $this->requireParam($arguments, 'profile_id', 'next_slot requires a profile_id.');
-        if ($profileId instanceof ToolResult) {
-            return $profileId;
-        }
-        $query = ['profileId' => $profileId];
-        $queueId = $this->ref($arguments, 'queue_id');
-        if ($queueId !== '') {
-            $query['queueId'] = $queueId;
-        }
-        $response = $this->client->get('/queue/next-slot', $query, $config);
-        return new ToolResult(true, "Next slot:\n" . $this->encode($response));
-    }
-
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function createSlot(array $arguments, ZernioConfig $config): ToolResult
     {
         $payload = $this->queuePayload($arguments, requireName: true, requireSlots: true);
@@ -155,29 +129,25 @@ final class ZernioQueueTool extends AbstractZernioTool
             return $payload;
         }
         $response = $this->client->post(self::SLOTS_PATH, $payload, $config);
-        return new ToolResult(true, "Created queue:\n" . $this->encode($response));
+        return $this->jsonResult("Created queue:\n", $response);
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function updateSlot(array $arguments, ZernioConfig $config): ToolResult
     {
         $payload = $this->queuePayload($arguments, requireName: false, requireSlots: true);
         if ($payload instanceof ToolResult) {
             return $payload;
         }
-        $queueId = $this->ref($arguments, 'queue_id');
+        $queueId = $this->arg($arguments, 'queue_id');
         if ($queueId !== '') {
             $payload['queueId'] = $queueId;
         }
         $response = $this->client->put(self::SLOTS_PATH, $payload, $config);
-        return new ToolResult(true, "Updated queue:\n" . $this->encode($response));
+        return $this->jsonResult("Updated queue:\n", $response);
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function deleteSlot(array $arguments, ZernioConfig $config): ToolResult
     {
         $profileId = $this->requireParam($arguments, 'profile_id', 'delete_slot requires a profile_id.');
@@ -206,7 +176,7 @@ final class ZernioQueueTool extends AbstractZernioTool
             return $profileId;
         }
 
-        $name = $this->ref($arguments, 'name');
+        $name = $this->arg($arguments, 'name');
         if ($requireName && $name === '') {
             return new ToolResult(false, 'create_slot requires a queue `name` (e.g. "Evening Posts").');
         }
@@ -223,11 +193,11 @@ final class ZernioQueueTool extends AbstractZernioTool
         if ($name !== '') {
             $payload['name'] = $name;
         }
-        $timezone = $this->ref($arguments, 'timezone');
+        $timezone = $this->arg($arguments, 'timezone');
         if ($timezone !== '') {
             $payload['timezone'] = $timezone;
         }
-        $payload['active'] = (bool) ($arguments['active'] ?? true);
+        $payload['active']            = (bool) ($arguments['active']              ?? true);
         $payload['setAsDefault']      = (bool) ($arguments['set_as_default']      ?? false);
         $payload['reshuffleExisting'] = (bool) ($arguments['reshuffle_existing'] ?? false);
         return $payload;
@@ -240,27 +210,11 @@ final class ZernioQueueTool extends AbstractZernioTool
     private function buildSlots(array $arguments): array|ToolResult
     {
         if (isset($arguments['slots']) && is_array($arguments['slots']) && $arguments['slots'] !== []) {
-            $out = [];
-            foreach ($arguments['slots'] as $entry) {
-                if (!is_array($entry)) {
-                    return new ToolResult(false, 'Each entry in `slots` must be an object {dayOfWeek, time}.');
-                }
-                $day = $entry['dayOfWeek'] ?? $entry['day_of_week'] ?? null;
-                $time = (string) ($entry['time'] ?? '');
-                if ($day === null || $time === '') {
-                    return new ToolResult(false, 'Each slot must have both dayOfWeek (0-6) and time (HH:MM).');
-                }
-                $normalised = $this->normaliseSlot($day, $time);
-                if ($normalised instanceof ToolResult) {
-                    return $normalised;
-                }
-                $out[] = $normalised;
-            }
-            return $out;
+            return $this->parseSlotArray($arguments['slots']);
         }
 
-        $day  = $this->ref($arguments, 'day');
-        $time = $this->ref($arguments, 'time');
+        $day  = $this->arg($arguments, 'day');
+        $time = $this->arg($arguments, 'time');
         if ($day === '' && $time === '') {
             return [];
         }
@@ -272,6 +226,31 @@ final class ZernioQueueTool extends AbstractZernioTool
             return $normalised;
         }
         return [$normalised];
+    }
+
+    /**
+     * @param  list<mixed> $entries
+     * @return list<array{dayOfWeek: int, time: string}>|ToolResult
+     */
+    private function parseSlotArray(array $entries): array|ToolResult
+    {
+        $out = [];
+        foreach ($entries as $entry) {
+            if (!is_array($entry)) {
+                return new ToolResult(false, 'Each entry in `slots` must be an object {dayOfWeek, time}.');
+            }
+            $day  = $entry['dayOfWeek'] ?? $entry['day_of_week'] ?? null;
+            $time = (string) ($entry['time'] ?? '');
+            if ($day === null || $time === '') {
+                return new ToolResult(false, 'Each slot must have both dayOfWeek (0-6) and time (HH:MM).');
+            }
+            $normalised = $this->normaliseSlot($day, $time);
+            if ($normalised instanceof ToolResult) {
+                return $normalised;
+            }
+            $out[] = $normalised;
+        }
+        return $out;
     }
 
     /**
@@ -287,13 +266,13 @@ final class ZernioQueueTool extends AbstractZernioTool
             $dayOfWeek = $numeric;
         } elseif (is_string($day)) {
             $map = [
-                'sunday'    => 0, 'sun' => 0,
-                'monday'    => 1, 'mon' => 1,
-                'tuesday'   => 2, 'tue' => 2, 'tues' => 2,
+                'sunday' => 0, 'sun' => 0,
+                'monday' => 1, 'mon' => 1,
+                'tuesday' => 2, 'tue' => 2, 'tues' => 2,
                 'wednesday' => 3, 'wed' => 3,
-                'thursday'  => 4, 'thu' => 4, 'thurs' => 4,
-                'friday'    => 5, 'fri' => 5,
-                'saturday'  => 6, 'sat' => 6,
+                'thursday' => 4, 'thu' => 4, 'thurs' => 4,
+                'friday' => 5, 'fri' => 5,
+                'saturday' => 6, 'sat' => 6,
             ];
             $key = strtolower(trim($day));
             if (!isset($map[$key])) {
@@ -313,46 +292,16 @@ final class ZernioQueueTool extends AbstractZernioTool
     /**
      * @param array<string, mixed> $response
      */
-    private function renderQueues(array $response): ToolResult
+    private function renderSlots(array $response): ToolResult
     {
         if (isset($response['queues']) && is_array($response['queues'])) {
             $items = $this->listKey($response, 'queues');
-            $count = count($items);
             return new ToolResult(
                 true,
-                "Queues ({$count}):\n" . $this->encode($items),
-                ['count' => $count],
+                'Queues (' . count($items) . "):\n" . $this->encode($items),
+                ['count' => count($items)],
             );
         }
-        return new ToolResult(true, "Queue:\n" . $this->encode($response));
-    }
-
-    /**
-     * @param  array<string, mixed> $arguments
-     * @return string|ToolResult
-     */
-    private function requireParam(array $arguments, string $key, string $error): string|ToolResult
-    {
-        $value = trim((string) ($arguments[$key] ?? ''));
-        if ($value === '') {
-            return new ToolResult(false, $error);
-        }
-        return $value;
-    }
-
-    /**
-     * @param array<string, mixed> $arguments
-     */
-    private function ref(array $arguments, string $key): string
-    {
-        return trim((string) ($arguments[$key] ?? ''));
-    }
-
-    /**
-     * @param mixed $value
-     */
-    private function encode(mixed $value): string
-    {
-        return (string) json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        return $this->jsonResult("Queue:\n", $response);
     }
 }

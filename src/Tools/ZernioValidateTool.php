@@ -62,36 +62,31 @@ final class ZernioValidateTool extends AbstractZernioTool
         };
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function post(array $arguments, ZernioConfig $config): ToolResult
     {
         $payload = [];
-        $content = trim((string) ($arguments['content'] ?? ''));
+        $content = $this->arg($arguments, 'content');
         if ($content !== '') {
             $payload['content'] = $content;
         }
         if (isset($arguments['media_items']) && is_array($arguments['media_items']) && $arguments['media_items'] !== []) {
             $payload['mediaItems'] = array_values($arguments['media_items']);
         }
-        $platform = $this->ref($arguments, 'platform');
+        $platform = $this->arg($arguments, 'platform');
         if ($platform !== '') {
             $payload['platform'] = $platform;
         }
         if ($payload === []) {
             return new ToolResult(false, 'validate_post requires at least one of content, media_items.');
         }
-        $response = $this->client->post('/tools/validate/post', $payload, $config);
-        return new ToolResult(true, "Post validation:\n" . $this->encode($response));
+        return $this->jsonResult("Post validation:\n", $this->client->post('/tools/validate/post', $payload, $config));
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function postLength(array $arguments, ZernioConfig $config): ToolResult
     {
-        $content = $this->requireParam($arguments, 'content', 'validate_post_length requires content.');
+        $content  = $this->requireParam($arguments, 'content', 'validate_post_length requires content.');
         if ($content instanceof ToolResult) {
             return $content;
         }
@@ -99,65 +94,29 @@ final class ZernioValidateTool extends AbstractZernioTool
         if ($platform instanceof ToolResult) {
             return $platform;
         }
-        $response = $this->client->post('/tools/validate/post-length', [
+        return $this->jsonResult("Post length:\n", $this->client->post('/tools/validate/post-length', [
             'content'  => $content,
             'platform' => $platform,
-        ], $config);
-        return new ToolResult(true, "Post length:\n" . $this->encode($response));
+        ], $config));
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function mediaUrl(array $arguments, ZernioConfig $config): ToolResult
     {
         $url = $this->requireParam($arguments, 'url', 'validate_media requires a url.');
         if ($url instanceof ToolResult) {
             return $url;
         }
-        $response = $this->client->post('/tools/validate/media', ['url' => $url], $config);
-        return new ToolResult(true, "Media validation:\n" . $this->encode($response));
+        return $this->jsonResult("Media validation:\n", $this->client->post('/tools/validate/media', ['url' => $url], $config));
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
+    /** @param array<string, mixed> $arguments */
     private function subreddit(array $arguments, ZernioConfig $config): ToolResult
     {
         $name = $this->requireParam($arguments, 'subreddit', 'validate_subreddit requires a subreddit.');
         if ($name instanceof ToolResult) {
             return $name;
         }
-        $response = $this->client->post('/tools/validate/subreddit', ['subreddit' => $name], $config);
-        return new ToolResult(true, "Subreddit validation:\n" . $this->encode($response));
-    }
-
-    /**
-     * @param  array<string, mixed> $arguments
-     * @return string|ToolResult
-     */
-    private function requireParam(array $arguments, string $key, string $error): string|ToolResult
-    {
-        $value = trim((string) ($arguments[$key] ?? ''));
-        if ($value === '') {
-            return new ToolResult(false, $error);
-        }
-        return $value;
-    }
-
-    /**
-     * @param array<string, mixed> $arguments
-     */
-    private function ref(array $arguments, string $key): string
-    {
-        return trim((string) ($arguments[$key] ?? ''));
-    }
-
-    /**
-     * @param mixed $value
-     */
-    private function encode(mixed $value): string
-    {
-        return (string) json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        return $this->jsonResult("Subreddit validation:\n", $this->client->post('/tools/validate/subreddit', ['subreddit' => $name], $config));
     }
 }
