@@ -124,7 +124,7 @@ final class ZernioQueueTool extends AbstractZernioTool
     /** @param array<string, mixed> $arguments */
     private function createSlot(array $arguments, ZernioConfig $config): ToolResult
     {
-        $payload = $this->queuePayload($arguments, requireName: true, requireSlots: true);
+        $payload = $this->createQueuePayload($arguments);
         if ($payload instanceof ToolResult) {
             return $payload;
         }
@@ -135,7 +135,7 @@ final class ZernioQueueTool extends AbstractZernioTool
     /** @param array<string, mixed> $arguments */
     private function updateSlot(array $arguments, ZernioConfig $config): ToolResult
     {
-        $payload = $this->queuePayload($arguments, requireName: false, requireSlots: true);
+        $payload = $this->updateQueuePayload($arguments);
         if ($payload instanceof ToolResult) {
             return $payload;
         }
@@ -169,26 +169,48 @@ final class ZernioQueueTool extends AbstractZernioTool
      * @param  array<string, mixed> $arguments
      * @return array<string, mixed>|ToolResult
      */
-    private function queuePayload(array $arguments, bool $requireName, bool $requireSlots): array|ToolResult
+    private function createQueuePayload(array $arguments): array|ToolResult
+    {
+        $name = $this->arg($arguments, 'name');
+        if ($name === '') {
+            return new ToolResult(false, 'create_slot requires a queue `name` (e.g. "Evening Posts").');
+        }
+        $slots = $this->buildSlots($arguments);
+        if ($slots instanceof ToolResult) {
+            return $slots;
+        }
+        if ($slots === []) {
+            return new ToolResult(false, 'A queue requires at least one slot. Pass `slots: [{dayOfWeek, time}, …]` or both `day` and `time`.');
+        }
+        return $this->buildQueuePayload($arguments, $name, $slots);
+    }
+
+    /**
+     * @param  array<string, mixed> $arguments
+     * @return array<string, mixed>|ToolResult
+     */
+    private function updateQueuePayload(array $arguments): array|ToolResult
+    {
+        $slots = $this->buildSlots($arguments);
+        if ($slots instanceof ToolResult) {
+            return $slots;
+        }
+        if ($slots === []) {
+            return new ToolResult(false, 'A queue requires at least one slot. Pass `slots: [{dayOfWeek, time}, …]` or both `day` and `time`.');
+        }
+        return $this->buildQueuePayload($arguments, $this->arg($arguments, 'name'), $slots);
+    }
+
+    /**
+     * @param  list<array{dayOfWeek: int, time: string}> $slots
+     * @return array<string, mixed>|ToolResult
+     */
+    private function buildQueuePayload(array $arguments, string $name, array $slots): array|ToolResult
     {
         $profileId = $this->requireParam($arguments, 'profile_id', 'A queue requires a profile_id.');
         if ($profileId instanceof ToolResult) {
             return $profileId;
         }
-
-        $name = $this->arg($arguments, 'name');
-        if ($requireName && $name === '') {
-            return new ToolResult(false, 'create_slot requires a queue `name` (e.g. "Evening Posts").');
-        }
-
-        $slots = $this->buildSlots($arguments);
-        if ($slots instanceof ToolResult) {
-            return $slots;
-        }
-        if ($requireSlots && $slots === []) {
-            return new ToolResult(false, 'A queue requires at least one slot. Pass `slots: [{dayOfWeek, time}, …]` or both `day` and `time`.');
-        }
-
         $payload = ['profileId' => $profileId, 'slots' => $slots];
         if ($name !== '') {
             $payload['name'] = $name;

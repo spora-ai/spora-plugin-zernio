@@ -64,7 +64,7 @@ final class ZernioAnalyticsTool extends AbstractZernioTool
 
         return $this->guard(fn(): ToolResult => match ($this->getOperationName($arguments)) {
             'follower_analytics' => $this->followerAnalytics($arguments, $config),
-            'best_time_to_post'  => $this->accountRead('Best time to post', '/analytics/best-time', $arguments, $config, requirePlatform: true),
+            'best_time_to_post'  => $this->bestTimeToPost($arguments, $config),
             'content_decay'      => $this->contentDecay($arguments, $config),
             'daily_metrics'      => $this->profileRead('Daily metrics', '/analytics/daily-metrics', $arguments, $config),
             'posting_frequency'  => $this->profileRead('Posting frequency', '/analytics/posting-frequency', $arguments, $config),
@@ -140,26 +140,19 @@ final class ZernioAnalyticsTool extends AbstractZernioTool
         return $this->jsonResult("Account health:\n", $this->client->get('/accounts/health', $query, $config));
     }
 
-    /**
-     * Account-scoped read: requires account_id, optionally platform.
-     *
-     * @param array<string, mixed> $arguments
-     */
-    private function accountRead(string $label, string $path, array $arguments, ZernioConfig $config, bool $requirePlatform): ToolResult
+    /** @param array<string, mixed> $arguments */
+    private function bestTimeToPost(array $arguments, ZernioConfig $config): ToolResult
     {
-        $accountId = $this->requireParam($arguments, 'account_id', "{$this->getOperationName($arguments)} requires an account_id.");
+        $accountId = $this->requireParam($arguments, 'account_id', 'best_time_to_post requires an account_id.');
         if ($accountId instanceof ToolResult) {
             return $accountId;
         }
-        $platform = $this->arg($arguments, 'platform');
-        if ($platform === '' && $requirePlatform) {
-            return new ToolResult(false, "{$this->getOperationName($arguments)} requires a platform.");
+        $platform = $this->requireParam($arguments, 'platform', 'best_time_to_post requires a platform.');
+        if ($platform instanceof ToolResult) {
+            return $platform;
         }
-        $query = ['accountId' => $accountId];
-        if ($platform !== '') {
-            $query['platform'] = $platform;
-        }
-        return $this->jsonResult("{$label}:\n", $this->client->get($path, $query, $config));
+        $query = ['accountId' => $accountId, 'platform' => $platform];
+        return $this->jsonResult("Best time to post:\n", $this->client->get('/analytics/best-time', $query, $config));
     }
 
     /**
