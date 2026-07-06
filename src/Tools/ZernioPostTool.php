@@ -538,16 +538,12 @@ final class ZernioPostTool extends AbstractZernioTool
     /** @param array<string, mixed> $arguments */
     private function modeLabel(array $arguments): string
     {
-        if ((bool) ($arguments['publish_now'] ?? false)) {
-            return 'published';
-        }
-        if ($this->arg($arguments, 'queued_from_profile') !== '') {
-            return 'queue-scheduled';
-        }
-        if ($this->arg($arguments, 'scheduled_for') !== '') {
-            return 'scheduled';
-        }
-        return 'drafted';
+        return match (true) {
+            (bool) ($arguments['publish_now']      ?? false) => 'published',
+            $this->arg($arguments, 'queued_from_profile') !== '' => 'queue-scheduled',
+            $this->arg($arguments, 'scheduled_for')        !== '' => 'scheduled',
+            default                                          => 'drafted',
+        };
     }
 
     /** @param array<string, mixed> $arguments */

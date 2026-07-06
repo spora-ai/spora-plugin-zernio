@@ -78,11 +78,11 @@ final class ZernioWebhooksTool extends AbstractZernioTool
     /** @param array<string, mixed> $arguments */
     private function createWebhook(array $arguments, ZernioConfig $config): ToolResult
     {
-        $missing = $this->missingCreateFields($arguments);
+        $payload = $this->webhookWritePayload($arguments);
+        $missing = $this->missingCreateField($payload);
         if ($missing !== null) {
             return new ToolResult(false, "create_webhook requires `{$missing}`.");
         }
-        $payload = $this->webhookWritePayload($arguments);
         return $this->jsonResult("Created webhook:\n", $this->client->post('/webhooks/settings', $payload, $config));
     }
 
@@ -153,14 +153,10 @@ final class ZernioWebhooksTool extends AbstractZernioTool
     }
 
     /**
-     * Return the first missing required field for create_webhook, or null
-     * if all of {name, url, events} are present.
-     *
-     * @param array<string, mixed> $arguments
+     * @param array<string, mixed> $payload
      */
-    private function missingCreateFields(array $arguments): ?string
+    private function missingCreateField(array $payload): ?string
     {
-        $payload = $this->webhookWritePayload($arguments);
         foreach (['name', 'url', 'events'] as $required) {
             if (empty($payload[$required])) {
                 return $required;
