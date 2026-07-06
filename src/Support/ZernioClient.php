@@ -37,52 +37,67 @@ final class ZernioClient
 
     /**
      * @param  array<string, scalar|null> $query
+     * @param  array<string, string>     $headers Extra headers to merge in (e.g. X-Request-Id for idempotency).
      * @return array<string, mixed>
      */
-    public function get(string $path, array $query, ZernioConfig $config): array
+    public function get(string $path, array $query, ZernioConfig $config, array $headers = []): array
     {
-        return $this->request('GET', $path, $query === [] ? [] : ['query' => $query], $config);
+        return $this->request('GET', $path, $query === [] ? [] : ['query' => $query], $config, $headers);
     }
 
     /**
-     * @param  array<string, mixed> $body
+     * @param  array<string, mixed>      $body
+     * @param  array<string, string>     $headers Extra headers to merge in (e.g. X-Request-Id for idempotency).
      * @return array<string, mixed>
      */
-    public function post(string $path, array $body, ZernioConfig $config): array
+    public function post(string $path, array $body, ZernioConfig $config, array $headers = []): array
     {
-        return $this->request('POST', $path, ['json' => $body], $config);
+        return $this->request('POST', $path, ['json' => $body], $config, $headers);
     }
 
     /**
-     * @param  array<string, mixed> $body
+     * @param  array<string, mixed>      $body
+     * @param  array<string, string>     $headers Extra headers to merge in.
      * @return array<string, mixed>
      */
-    public function put(string $path, array $body, ZernioConfig $config): array
+    public function put(string $path, array $body, ZernioConfig $config, array $headers = []): array
     {
-        return $this->request('PUT', $path, ['json' => $body], $config);
+        return $this->request('PUT', $path, ['json' => $body], $config, $headers);
+    }
+
+    /**
+     * @param  array<string, mixed>      $body
+     * @param  array<string, string>     $headers Extra headers to merge in.
+     * @return array<string, mixed>
+     */
+    public function patch(string $path, array $body, ZernioConfig $config, array $headers = []): array
+    {
+        return $this->request('PATCH', $path, ['json' => $body], $config, $headers);
     }
 
     /**
      * @param  array<string, scalar|null> $query
+     * @param  array<string, string>      $headers Extra headers to merge in.
      * @return array<string, mixed>
      */
-    public function delete(string $path, array $query, ZernioConfig $config): array
+    public function delete(string $path, array $query, ZernioConfig $config, array $headers = []): array
     {
-        return $this->request('DELETE', $path, $query === [] ? [] : ['query' => $query], $config);
+        return $this->request('DELETE', $path, $query === [] ? [] : ['query' => $query], $config, $headers);
     }
 
     /**
-     * @param  array<string, mixed> $options
+     * @param  array<string, mixed>  $options
+     * @param  array<string, string> $headers
      * @return array<string, mixed>
      */
-    private function request(string $method, string $path, array $options, ZernioConfig $config): array
+    private function request(string $method, string $path, array $options, ZernioConfig $config, array $headers = []): array
     {
         $url = rtrim($config->baseUrl, '/') . '/' . ltrim($path, '/');
         $requestOptions = array_merge($options, [
-            'headers' => [
+            'headers' => array_merge([
                 'Authorization' => 'Bearer ' . $config->apiKey,
                 'Accept'        => 'application/json',
-            ],
+            ], $headers),
             'timeout' => $config->timeout,
         ]);
 

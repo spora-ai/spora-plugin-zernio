@@ -21,12 +21,12 @@ it('sends a bearer token, joins the base URL, and decodes JSON on GET', function
                 && $opts['timeout'] === 30
                 && $opts['query'] === ['profileId' => 'p1'];
         }))
-        ->andReturn(zernioResponse(200, '{"data":[{"id":"a1"}]}'));
+        ->andReturn(zernioResponse(200, '{"accounts":[{"id":"a1"}]}'));
 
     $client = new ZernioClient($http);
     $result = $client->get('/accounts', ['profileId' => 'p1'], zernioTestConfig());
 
-    expect($result)->toBe(['data' => [['id' => 'a1']]]);
+    expect($result)->toBe(['accounts' => [['id' => 'a1']]]);
 });
 
 it('sends a JSON body on POST', function (): void {
@@ -42,13 +42,32 @@ it('sends a JSON body on POST', function (): void {
     expect($client->post('/posts', ['content' => 'hi'], zernioTestConfig()))->toBe(['id' => 'post_1']);
 });
 
+it('merges extra per-request headers with the auth + accept defaults', function (): void {
+    $http = Mockery::mock(HttpClientInterface::class);
+    $http->expects('request')
+        ->with('POST', 'https://zernio.com/api/v1/posts', Mockery::on(function (array $opts): bool {
+            return $opts['headers']['Authorization'] === 'Bearer sk_test_key'
+                && $opts['headers']['Accept'] === 'application/json'
+                && ($opts['headers']['X-Request-Id'] ?? null) === '11111111-2222-4333-8444-555555555555';
+        }))
+        ->andReturn(zernioResponse(201, '{"id":"post_1"}'));
+
+    $client = new ZernioClient($http);
+    $client->post(
+        '/posts',
+        ['content' => 'hi'],
+        zernioTestConfig(),
+        ['X-Request-Id' => '11111111-2222-4333-8444-555555555555'],
+    );
+});
+
 it('returns an empty array for an empty body (e.g. 204 on DELETE)', function (): void {
     $http = Mockery::mock(HttpClientInterface::class);
     $http->expects('request')->andReturn(zernioResponse(204, ''));
 
     $client = new ZernioClient($http);
 
-    expect($client->delete('/posts/1', [], zernioTestConfig()))->toBe([]);
+    expect($client->delete('/accounts/abc', [], zernioTestConfig()))->toBe([]);
 });
 
 it('throws a ZernioApiException carrying the status on HTTP >= 400', function (): void {

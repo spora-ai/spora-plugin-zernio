@@ -118,4 +118,22 @@ abstract class AbstractZernioTool extends AbstractTool
         $envTimeout = (int) ($_ENV['SPORA_TOOL_HTTP_TIMEOUT'] ?? getenv('SPORA_TOOL_HTTP_TIMEOUT') ?: 0);
         return $envTimeout > 0 ? $envTimeout : 30;
     }
+
+    /**
+     * Pull the list out of a Zernio response envelope, trying each candidate
+     * key in order (e.g. "accounts" / "data"). Falls back to treating the
+     * whole response as the list so a flat array is still rendered.
+     *
+     * @param  array<string, mixed> $response
+     * @return list<mixed>
+     */
+    protected function listKey(array $response, string ...$keys): array
+    {
+        foreach ($keys as $key) {
+            if (isset($response[$key]) && is_array($response[$key])) {
+                return array_values($response[$key]);
+            }
+        }
+        return array_values($response);
+    }
 }

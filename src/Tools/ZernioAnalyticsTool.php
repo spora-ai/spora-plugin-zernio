@@ -12,28 +12,47 @@ use Spora\Tools\Attributes\ToolSetting;
 use Spora\Tools\ValueObjects\ToolResult;
 
 /**
- * Read-only analytics for Zernio posts and accounts: post performance metrics
- * and follower counts over time.
+ * Read-only analytics for Zernio. The endpoints here match the Zernio
+ * OpenAPI spec v1.0.4:
  *
- * NOTE: the exact Zernio analytics endpoint paths and response fields should be
- * confirmed against https://docs.zernio.com/ and the SDK's AnalyticsApi docs;
- * the paths below reflect the documented `/analytics/*` surface.
+ *   - post_analytics         → GET /v1/analytics
+ *   - follower_analytics     → GET /v1/accounts/follower-stats
+ *   - best_time_to_post      → GET /v1/analytics/best-time
+ *   - content_decay          → GET /v1/analytics/content-decay
+ *   - daily_metrics          → GET /v1/analytics/daily-metrics
+ *   - posting_frequency      → GET /v1/analytics/posting-frequency
+ *   - account_health         → GET /v1/accounts/health (bulk)
  */
 #[Tool(
     name: 'zernio_analytics',
-    description: 'Read Zernio analytics: post performance metrics and follower statistics for connected accounts.',
+    description: 'Read Zernio analytics: per-post metrics, follower stats, best time to post, content decay, daily rollups, posting frequency, and account health. All operations are read-only.',
     displayName: 'Zernio Analytics',
     category: 'social-media',
 )]
-#[ToolOperation(name: 'post_analytics', description: 'Get performance metrics for posts', enabledByDefault: true, requiresApprovalByDefault: false)]
-#[ToolOperation(name: 'follower_analytics', description: 'Get follower statistics for an account', enabledByDefault: true, requiresApprovalByDefault: false)]
+#[ToolOperation(name: 'post_analytics', description: 'Per-post or per-account performance metrics', enabledByDefault: true, requiresApprovalByDefault: false)]
+#[ToolOperation(name: 'follower_analytics', description: 'Follower count history for one or more accounts', enabledByDefault: true, requiresApprovalByDefault: false)]
+#[ToolOperation(name: 'best_time_to_post', description: 'Best times of day to post for a given account/platform', enabledByDefault: true, requiresApprovalByDefault: false)]
+#[ToolOperation(name: 'content_decay', description: 'Performance decay curve for a post or account', enabledByDefault: true, requiresApprovalByDefault: false)]
+#[ToolOperation(name: 'daily_metrics', description: 'Cross-platform daily metrics rollup for a profile', enabledByDefault: true, requiresApprovalByDefault: false)]
+#[ToolOperation(name: 'posting_frequency', description: 'Posting frequency vs engagement for a profile', enabledByDefault: true, requiresApprovalByDefault: false)]
+#[ToolOperation(name: 'account_health', description: 'Bulk account health snapshot (token status, permissions)', enabledByDefault: true, requiresApprovalByDefault: false)]
 #[ToolSetting(key: 'api_key', label: 'Zernio API Key', type: 'password', description: 'Bearer token for the Zernio API. Falls back to the ZERNIO_API_KEY environment variable.', required: false)]
 #[ToolSetting(key: 'base_url', label: 'Base URL', type: 'text', description: 'Zernio API base URL (default: https://zernio.com/api/v1).', default: 'https://zernio.com/api/v1')]
 #[ToolSetting(key: 'http_timeout', label: 'HTTP Timeout', type: 'text', description: 'Seconds before an HTTP request fails (default: 30).')]
-#[ToolParameter(name: 'post_id', type: 'string', description: 'Post ID to fetch metrics for. Used by post_analytics.', required: false)]
-#[ToolParameter(name: 'account_id', type: 'string', description: 'Account ID to fetch follower stats for. Used by follower_analytics.', required: false)]
-#[ToolParameter(name: 'start_date', type: 'string', description: 'Optional ISO-8601 start date for the reporting range.', required: false)]
-#[ToolParameter(name: 'end_date', type: 'string', description: 'Optional ISO-8601 end date for the reporting range.', required: false)]
+#[ToolParameter(name: 'post_id', type: 'string', description: 'Post ID for post_analytics (single post lookup).', required: false)]
+#[ToolParameter(name: 'account_id', type: 'string', description: 'Account ID for post_analytics (batch lookup), follower_analytics, best_time_to_post, or content_decay.', required: false)]
+#[ToolParameter(name: 'account_ids', type: 'string', description: 'Comma-separated list of account IDs for follower_analytics (e.g. "id1,id2"). Defaults to all user accounts when omitted.', required: false)]
+#[ToolParameter(name: 'platform', type: 'string', description: 'Platform name (e.g. "twitter", "instagram") — required for post_analytics/best_time_to_post, optional filter for account_health.', required: false)]
+#[ToolParameter(name: 'profile_id', type: 'string', description: 'Profile ID filter for account_health, daily_metrics, posting_frequency, follower_analytics.', required: false)]
+#[ToolParameter(name: 'status', type: 'string', description: 'Account-health status filter: "healthy" | "warning" | "error".', required: false)]
+#[ToolParameter(name: 'from_date', type: 'string', description: 'ISO-8601 date (YYYY-MM-DD) inclusive lower bound. Defaults to 90 days ago for post_analytics, 30 days ago for follower_analytics.', required: false)]
+#[ToolParameter(name: 'to_date', type: 'string', description: 'ISO-8601 date (YYYY-MM-DD) inclusive upper bound. Defaults to today.', required: false)]
+#[ToolParameter(name: 'granularity', type: 'string', description: 'Aggregation level for follower_analytics: "daily" (default) | "weekly" | "monthly".', required: false)]
+#[ToolParameter(name: 'sort_by', type: 'string', description: 'Sort by for post_analytics: "date" (default) | "engagement" | "impressions" | "reach" | "likes" | "comments" | "shares" | "saves" | "clicks" | "views".', required: false)]
+#[ToolParameter(name: 'order', type: 'string', description: 'Sort order: "desc" (default) | "asc".', required: false)]
+#[ToolParameter(name: 'source', type: 'string', description: 'Post source filter for post_analytics: "all" (default) | "late" (Zernio-authored) | "external" (synced from platform).', required: false)]
+#[ToolParameter(name: 'page', type: 'integer', description: 'Page number for post_analytics (default 1).', required: false, default: 1)]
+#[ToolParameter(name: 'limit', type: 'integer', description: 'Page size for post_analytics (1-100, default 50).', required: false, default: 50)]
 final class ZernioAnalyticsTool extends AbstractZernioTool
 {
     public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
@@ -44,16 +63,26 @@ final class ZernioAnalyticsTool extends AbstractZernioTool
         }
 
         return $this->guard(fn(): ToolResult => match ($this->getOperationName($arguments)) {
-            'follower_analytics' => $this->followerAnalytics($arguments, $config),
-            default              => $this->postAnalytics($arguments, $config),
+            'follower_analytics'   => $this->followerAnalytics($arguments, $config),
+            'best_time_to_post'    => $this->simpleAccount('Best time to post', '/analytics/best-time', $arguments, $config, requirePlatform: true),
+            'content_decay'        => $this->contentDecay($arguments, $config),
+            'daily_metrics'        => $this->profileRead('Daily metrics', '/analytics/daily-metrics', $arguments, $config),
+            'posting_frequency'    => $this->profileRead('Posting frequency', '/analytics/posting-frequency', $arguments, $config),
+            'account_health'       => $this->accountHealth($arguments, $config),
+            default                => $this->postAnalytics($arguments, $config),
         });
     }
 
     public function describeAction(array $arguments): string
     {
         return match ($this->getOperationName($arguments)) {
-            'follower_analytics' => 'Get Zernio follower analytics',
-            default              => 'Get Zernio post analytics',
+            'follower_analytics'   => 'Get Zernio follower analytics',
+            'best_time_to_post'    => 'Get best times to post for a Zernio account',
+            'content_decay'        => 'Get content decay for a Zernio post or account',
+            'daily_metrics'        => 'Get cross-platform daily metrics for a Zernio profile',
+            'posting_frequency'    => 'Get posting frequency vs engagement for a Zernio profile',
+            'account_health'       => 'Get Zernio account health snapshot',
+            default                => 'Get Zernio post analytics',
         };
     }
 
@@ -62,15 +91,32 @@ final class ZernioAnalyticsTool extends AbstractZernioTool
      */
     private function postAnalytics(array $arguments, ZernioConfig $config): ToolResult
     {
-        $query = $this->dateRange($arguments);
-        $postId = trim((string) ($arguments['post_id'] ?? ''));
+        $postId = $this->ref($arguments, 'post_id');
         if ($postId !== '') {
-            $query['postId'] = $postId;
+            $query = ['postId' => $postId];
+        } else {
+            $accountId = $this->requireParam($arguments, 'account_id', 'post_analytics requires an account_id (or a post_id for a single post).');
+            if ($accountId instanceof ToolResult) {
+                return $accountId;
+            }
+            $platform = $this->requireParam($arguments, 'platform', 'post_analytics requires a platform when fetching by account_id.');
+            if ($platform instanceof ToolResult) {
+                return $platform;
+            }
+            $query = ['accountId' => $accountId, 'platform' => $platform];
         }
+        $query = array_merge($query, $this->listFilter($arguments, [
+            'profile_id' => 'profileId',
+            'source'     => 'source',
+        ]));
+        $query['sortBy'] = trim((string) ($arguments['sort_by'] ?? 'date'));
+        $query['order']  = trim((string) ($arguments['order']   ?? 'desc'));
+        $query = array_merge($query, $this->dateRange($arguments));
+        $query['page']  = isset($arguments['page']) ? max(1, (int) $arguments['page']) : 1;
+        $query['limit'] = isset($arguments['limit']) ? max(1, min(100, (int) $arguments['limit'])) : 50;
 
-        $response = $this->client->get('/analytics/posts', $query, $config);
-
-        return new ToolResult(true, "Post analytics:\n" . json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $response = $this->client->get('/analytics', $query, $config);
+        return new ToolResult(true, "Post analytics:\n" . $this->encode($response));
     }
 
     /**
@@ -78,17 +124,93 @@ final class ZernioAnalyticsTool extends AbstractZernioTool
      */
     private function followerAnalytics(array $arguments, ZernioConfig $config): ToolResult
     {
-        $accountId = trim((string) ($arguments['account_id'] ?? ''));
-        if ($accountId === '') {
-            return new ToolResult(false, 'follower_analytics requires an account_id.');
+        $query = [];
+        $accountIds = $this->ref($arguments, 'account_ids');
+        if ($accountIds !== '') {
+            $query['accountIds'] = $accountIds;
         }
+        $query = array_merge($query, $this->listFilter($arguments, [
+            'profile_id'  => 'profileId',
+            'granularity' => 'granularity',
+        ]));
+        $query = array_merge($query, $this->dateRange($arguments));
 
-        $query = $this->dateRange($arguments);
-        $query['accountId'] = $accountId;
+        $response = $this->client->get('/accounts/follower-stats', $query, $config);
+        return new ToolResult(true, "Follower analytics:\n" . $this->encode($response));
+    }
 
-        $response = $this->client->get('/analytics/followers', $query, $config);
+    /**
+     * @param array<string, mixed> $arguments
+     */
+    private function contentDecay(array $arguments, ZernioConfig $config): ToolResult
+    {
+        $accountId = $this->ref($arguments, 'account_id');
+        $postId    = $this->ref($arguments, 'post_id');
+        $platform  = $this->ref($arguments, 'platform');
+        if ($accountId === '' && $postId === '') {
+            return new ToolResult(false, 'content_decay requires either account_id (with platform) or post_id.');
+        }
+        $query = [];
+        if ($accountId !== '') {
+            $query['accountId'] = $accountId;
+        }
+        if ($platform !== '') {
+            $query['platform'] = $platform;
+        }
+        if ($postId !== '') {
+            $query['postId'] = $postId;
+        }
+        $response = $this->client->get('/analytics/content-decay', $query, $config);
+        return new ToolResult(true, "Content decay:\n" . $this->encode($response));
+    }
 
-        return new ToolResult(true, "Follower analytics:\n" . json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+    /**
+     * @param array<string, mixed> $arguments
+     */
+    private function accountHealth(array $arguments, ZernioConfig $config): ToolResult
+    {
+        $query = $this->listFilter($arguments, [
+            'profile_id' => 'profileId',
+            'platform'   => 'platform',
+            'status'     => 'status',
+        ]);
+        $response = $this->client->get('/accounts/health', $query, $config);
+        return new ToolResult(true, "Account health:\n" . $this->encode($response));
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     */
+    private function simpleAccount(string $label, string $path, array $arguments, ZernioConfig $config, bool $requirePlatform): ToolResult
+    {
+        $accountId = $this->requireParam($arguments, 'account_id', "{$this->getOperationName($arguments)} requires an account_id.");
+        if ($accountId instanceof ToolResult) {
+            return $accountId;
+        }
+        $query = ['accountId' => $accountId];
+        $platform = $this->ref($arguments, 'platform');
+        if ($platform !== '') {
+            $query['platform'] = $platform;
+        } elseif ($requirePlatform) {
+            return new ToolResult(false, "{$this->getOperationName($arguments)} requires a platform.");
+        }
+        $response = $this->client->get($path, $query, $config);
+        return new ToolResult(true, "{$label}:\n" . $this->encode($response));
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     */
+    private function profileRead(string $label, string $path, array $arguments, ZernioConfig $config): ToolResult
+    {
+        $profileId = $this->requireParam($arguments, 'profile_id', "{$this->getOperationName($arguments)} requires a profile_id.");
+        if ($profileId instanceof ToolResult) {
+            return $profileId;
+        }
+        $query = ['profileId' => $profileId];
+        $query = array_merge($query, $this->dateRange($arguments));
+        $response = $this->client->get($path, $query, $config);
+        return new ToolResult(true, "{$label}:\n" . $this->encode($response));
     }
 
     /**
@@ -98,12 +220,58 @@ final class ZernioAnalyticsTool extends AbstractZernioTool
     private function dateRange(array $arguments): array
     {
         $query = [];
-        foreach (['start_date' => 'startDate', 'end_date' => 'endDate'] as $arg => $param) {
+        foreach (['from_date' => 'fromDate', 'to_date' => 'toDate'] as $arg => $param) {
             $value = trim((string) ($arguments[$arg] ?? ''));
             if ($value !== '') {
                 $query[$param] = $value;
             }
         }
         return $query;
+    }
+
+    /**
+     * @param  array<string, mixed> $arguments
+     * @param  array<string, string> $map
+     * @return array<string, string>
+     */
+    private function listFilter(array $arguments, array $map): array
+    {
+        $query = [];
+        foreach ($map as $arg => $param) {
+            $value = trim((string) ($arguments[$arg] ?? ''));
+            if ($value !== '') {
+                $query[$param] = $value;
+            }
+        }
+        return $query;
+    }
+
+    /**
+     * @param  array<string, mixed> $arguments
+     * @return string|ToolResult
+     */
+    private function requireParam(array $arguments, string $key, string $error): string|ToolResult
+    {
+        $value = trim((string) ($arguments[$key] ?? ''));
+        if ($value === '') {
+            return new ToolResult(false, $error);
+        }
+        return $value;
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     */
+    private function ref(array $arguments, string $key): string
+    {
+        return trim((string) ($arguments[$key] ?? ''));
+    }
+
+    /**
+     * @param mixed $value
+     */
+    private function encode(mixed $value): string
+    {
+        return (string) json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     }
 }
