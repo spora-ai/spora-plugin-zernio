@@ -81,10 +81,11 @@ final class ZernioWebhooksTool extends AbstractZernioTool
     /** @param array<string, mixed> $arguments */
     private function createWebhook(array $arguments, ZernioConfig $config): ToolResult
     {
-        $payload = $this->webhookWritePayload($arguments, requireAll: true);
-        if ($payload instanceof ToolResult) {
-            return $payload;
+        $missing = $this->missingCreateFields($arguments);
+        if ($missing !== null) {
+            return new ToolResult(false, "create_webhook requires `{$missing}`.");
         }
+        $payload = $this->webhookWritePayload($arguments);
         return $this->jsonResult("Created webhook:\n", $this->client->post('/webhooks/settings', $payload, $config));
     }
 
@@ -95,11 +96,8 @@ final class ZernioWebhooksTool extends AbstractZernioTool
         if ($id instanceof ToolResult) {
             return $id;
         }
-        $payload = $this->webhookWritePayload($arguments, requireAll: false);
-        if ($payload instanceof ToolResult) {
-            return $payload;
-        }
-        $payload['_id'] = $id;
+        $payload             = $this->webhookWritePayload($arguments);
+        $payload['_id']      = $id;
         return $this->jsonResult("Updated webhook:\n", $this->client->put('/webhooks/settings', $payload, $config));
     }
 
@@ -138,9 +136,9 @@ final class ZernioWebhooksTool extends AbstractZernioTool
 
     /**
      * @param  array<string, mixed> $arguments
-     * @return array<string, mixed>|ToolResult
+     * @return array<string, mixed>
      */
-    private function webhookWritePayload(array $arguments, bool $requireAll): array|ToolResult
+    private function webhookWritePayload(array $arguments): array
     {
         $payload = $this->stringMap($arguments, [
             'name'   => 'name',
@@ -150,21 +148,27 @@ final class ZernioWebhooksTool extends AbstractZernioTool
         if (isset($arguments['events']) && is_array($arguments['events']) && $arguments['events'] !== []) {
             $payload['events'] = array_values($arguments['events']);
         }
-        if (array_key_exists('is_active', $arguments)) {
-            $payload['isActive'] = (bool) $arguments['is_active'];
-        } else {
-            $payload['isActive'] = true;
-        }
+        $payload['isActive'] = (bool) ($arguments['is_active'] ?? true);
         if (isset($arguments['custom_headers']) && is_array($arguments['custom_headers'])) {
             $payload['customHeaders'] = $arguments['custom_headers'];
         }
-        if ($requireAll) {
-            foreach (['name', 'url', 'events'] as $required) {
-                if (empty($payload[$required])) {
-                    return new ToolResult(false, "create_webhook requires `{$required}`.");
-                }
+        return $payload;
+    }
+
+    /**
+     * Return the first missing required field for create_webhook, or null
+     * if all of {name, url, events} are present.
+     *
+     * @param array<string, mixed> $arguments
+     */
+    private function missingCreateFields(array $arguments): ?string
+    {
+        $payload = $this->webhookWritePayload($arguments);
+        foreach (['name', 'url', 'events'] as $required) {
+            if (empty($payload[$required])) {
+                return $required;
             }
         }
-        return $payload;
+        return null;
     }
 }
