@@ -301,37 +301,38 @@ final class ZernioPostTool extends AbstractZernioTool
     {
         $postId   = $this->requireParam($arguments, 'post_id', 'unpublish_post requires a post_id.');
         $platform = $this->requireParam($arguments, 'platform_for_unpublish', 'unpublish_post requires a platform_for_unpublish.');
-        if ($postId instanceof ToolResult) {
-            return $postId;
-        }
         if ($platform instanceof ToolResult) {
             return $platform;
         }
-        $response = $this->client->post(
-            self::POST_PATH . rawurlencode($postId) . self::UNPUBLISH_SUFFIX,
-            ['platform' => $platform],
+        return $this->postSubresource(
+            $arguments,
             $config,
+            'post_id',
+            self::POST_PATH,
+            self::UNPUBLISH_SUFFIX,
+            'unpublish_post',
+            body: ['platform' => $platform],
+            successLabel: "Unpublished post from {$platform}:\n",
         );
-        return $this->jsonResult("Unpublished post from {$platform}:\n", $response);
     }
 
     /** @param array<string, mixed> $arguments */
     private function editPost(array $arguments, ZernioConfig $config): ToolResult
     {
-        $postId  = $this->requireParam($arguments, 'post_id', 'edit_post requires a post_id.');
         $content = $this->requireParam($arguments, 'edit_content', 'edit_post requires edit_content.');
-        if ($postId instanceof ToolResult) {
-            return $postId;
-        }
         if ($content instanceof ToolResult) {
             return $content;
         }
-        $response = $this->client->post(
-            self::POST_PATH . rawurlencode($postId) . self::EDIT_SUFFIX,
-            ['platform' => 'twitter', 'content' => $content],
+        return $this->postSubresource(
+            $arguments,
             $config,
+            'post_id',
+            self::POST_PATH,
+            self::EDIT_SUFFIX,
+            'edit_post',
+            body: ['platform' => 'twitter', 'content' => $content],
+            successLabel: "Edited post:\n",
         );
-        return $this->jsonResult("Edited post:\n", $response);
     }
 
     /** @param array<string, mixed> $arguments */
@@ -343,15 +344,24 @@ final class ZernioPostTool extends AbstractZernioTool
         if ($postId === '' && ($videoId === '' || $accountId === '')) {
             return new ToolResult(false, 'update_post_metadata requires either a post_id or both video_id and account_id.');
         }
+        $payload = $this->metadataPayload($arguments, $postId, $videoId, $accountId);
+        $path    = $postId !== ''
+            ? self::POST_PATH . rawurlencode($postId) . self::UPDATE_META_SUFFIX
+            : self::POSTS_PATH . self::UPDATE_META_SUFFIX;
+        return $this->jsonResult("Updated YouTube metadata:\n", $this->client->post($path, $payload, $config));
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     * @return array<string, mixed>
+     */
+    private function metadataPayload(array $arguments, string $postId, string $videoId, string $accountId): array
+    {
         $payload = ['platform' => 'youtube'];
-        if ($postId !== '') {
-            $payload['postId'] = $postId;
-        }
-        if ($videoId !== '') {
-            $payload['videoId'] = $videoId;
-        }
-        if ($accountId !== '') {
-            $payload['accountId'] = $accountId;
+        foreach (['postId' => $postId, 'videoId' => $videoId, 'accountId' => $accountId] as $key => $value) {
+            if ($value !== '') {
+                $payload[$key] = $value;
+            }
         }
         $payload += $this->stringMap($arguments, [
             'yt_title'          => 'title',
@@ -370,10 +380,7 @@ final class ZernioPostTool extends AbstractZernioTool
         if (array_key_exists('yt_contains_synthetic_media', $arguments)) {
             $payload['containsSyntheticMedia'] = (bool) $arguments['yt_contains_synthetic_media'];
         }
-        $path = $postId !== ''
-            ? self::POST_PATH . rawurlencode($postId) . self::UPDATE_META_SUFFIX
-            : self::POSTS_PATH . self::UPDATE_META_SUFFIX;
-        return $this->jsonResult("Updated YouTube metadata:\n", $this->client->post($path, $payload, $config));
+        return $payload;
     }
 
     /** @param array<string, mixed> $arguments */

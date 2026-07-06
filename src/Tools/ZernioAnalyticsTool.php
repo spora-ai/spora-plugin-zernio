@@ -90,13 +90,11 @@ final class ZernioAnalyticsTool extends AbstractZernioTool
     private function postAnalytics(array $arguments, ZernioConfig $config): ToolResult
     {
         $postId = $this->arg($arguments, 'post_id');
-        if ($postId !== '') {
-            $query = ['postId' => $postId];
-        } else {
-            $query = $this->accountAnalyticsQuery($arguments);
-            if ($query === []) {
-                return new ToolResult(false, 'post_analytics requires an account_id (or a post_id for a single post).');
-            }
+        $query  = $postId !== ''
+            ? ['postId' => $postId]
+            : $this->requireAccountAnalyticsQuery($arguments);
+        if ($query instanceof ToolResult) {
+            return $query;
         }
         $query['sortBy'] = $this->arg($arguments, 'sort_by') ?: 'date';
         $query['order']  = $this->arg($arguments, 'order') ?: 'desc';
@@ -181,17 +179,17 @@ final class ZernioAnalyticsTool extends AbstractZernioTool
 
     /**
      * @param  array<string, mixed> $arguments
-     * @return array<string, string>
+     * @return array<string, string>|ToolResult
      */
-    private function accountAnalyticsQuery(array $arguments): array
+    private function requireAccountAnalyticsQuery(array $arguments): array|ToolResult
     {
         $accountId = $this->requireParam($arguments, 'account_id', 'post_analytics requires an account_id (or a post_id for a single post).');
         if ($accountId instanceof ToolResult) {
-            return [];
+            return $accountId;
         }
         $platform = $this->requireParam($arguments, 'platform', 'post_analytics requires a platform when fetching by account_id.');
         if ($platform instanceof ToolResult) {
-            return [];
+            return $platform;
         }
         return ['accountId' => $accountId, 'platform' => $platform];
     }
