@@ -61,6 +61,48 @@ it('merges extra per-request headers with the auth + accept defaults', function 
     );
 });
 
+it('sends a raw string body with an explicit Content-Type via postRaw', function (): void {
+    // Regression for the bulk_upload bug: post() always JSON-wraps the body,
+    // so the old ['headers' => ..., 'body' => ...] shape was sent as JSON
+    // fields, not as actual request headers/body. postRaw must forward the
+    // raw string with the explicit Content-Type and *must not* JSON-encode it.
+    $http = Mockery::mock(HttpClientInterface::class);
+    $http->expects('request')
+        ->with('POST', 'https://zernio.com/api/v1/posts/bulk-upload', Mockery::on(function (array $opts): bool {
+            return !isset($opts['json'])
+                && ($opts['body'] ?? null) === "content,account_id\nhello,a1"
+                && ($opts['headers']['Authorization'] ?? null) === 'Bearer sk_test_key'
+                && ($opts['headers']['Content-Type'] ?? null) === 'text/csv';
+        }))
+        ->andReturn(zernioResponse(200, '{"total":1,"valid":1}'));
+
+    $client = new ZernioClient($http);
+    $client->postRaw('/posts/bulk-upload', "content,account_id\nhello,a1", 'text/csv', zernioTestConfig());
+});
+
+it('lets option-level headers coexist with auth defaults (regression for request() merge)', function (): void {
+    // Direct test of the request() merge: when the caller passes 'headers'
+    // inside $options (postRaw does this with Content-Type), request() must
+    // merge those headers with the auth + Accept defaults instead of
+    // silently overwriting them. Bug pre-fix: array_merge($options, [...])
+    // overwrote $options['headers'] with just the auth defaults, dropping
+    // Content-Type from the wire request.
+    $http = Mockery::mock(HttpClientInterface::class);
+    $http->expects('request')
+        ->with('POST', 'https://zernio.com/api/v1/posts/bulk-upload', Mockery::on(function (array $opts): bool {
+            return ($opts['headers']['Authorization'] ?? null) === 'Bearer sk_test_key'
+                && ($opts['headers']['Accept'] ?? null) === 'application/json'
+                && ($opts['headers']['Content-Type'] ?? null) === 'text/csv'
+                && ($opts['body'] ?? null) === 'a,b,c';
+        }))
+        ->andReturn(zernioResponse(200, '{}'));
+
+    $client = new ZernioClient($http);
+    // postRaw is the easiest way to exercise this path without exposing
+    // request() publicly; if its Content-Type ever drops again, this test fails.
+    $client->postRaw('/posts/bulk-upload', 'a,b,c', 'text/csv', zernioTestConfig());
+});
+
 it('returns an empty array for an empty body (e.g. 204 on DELETE)', function (): void {
     $http = Mockery::mock(HttpClientInterface::class);
     $http->expects('request')->andReturn(zernioResponse(204, ''));

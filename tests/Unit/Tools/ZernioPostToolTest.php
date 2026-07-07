@@ -322,6 +322,25 @@ it('rejects an empty update_post body', function (): void {
     expect($result->success)->toBeFalse();
 });
 
+it('rejects update_post with scheduled_for but no timezone with the scheduling error', function (): void {
+    // Regression for the bug where buildUpdatePayload swallowed the
+    // PostPayloadBuilder::schedulingPayload ToolResult, so an invalid
+    // scheduled_for/timezone pair silently fell through to a generic
+    // "empty update" error (or a partial PUT). The caller must see the
+    // clear "timezone" message and the API must never be called.
+    $http = Mockery::mock(HttpClientInterface::class);
+    $http->shouldNotReceive('request');
+
+    $result = postTool($http)->execute([
+        'action'        => 'update_post',
+        'post_id'       => 'post_1',
+        'scheduled_for' => '2026-08-01T10:00:00Z',
+    ], agentId: 1);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->content)->toContain('timezone');
+});
+
 // ---------------------------------------------------------------------------
 // retry / unpublish / edit / update_post_metadata
 // ---------------------------------------------------------------------------
