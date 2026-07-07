@@ -49,6 +49,8 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolParameter(name: 'event_name', type: 'string', description: 'Event name to send for test_webhook (e.g. "webhook.test", "post.published").', required: false)]
 final class ZernioWebhooksTool extends AbstractZernioTool
 {
+    private const SETTINGS_PATH = '/webhooks/settings';
+
     public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
     {
         return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
@@ -58,7 +60,7 @@ final class ZernioWebhooksTool extends AbstractZernioTool
                 'delete_webhook'   => $this->deleteWebhook($arguments, $config),
                 'get_webhook_logs' => $this->webhookLogs($arguments, $config),
                 'test_webhook'     => $this->testWebhook($arguments, $config),
-                default            => $this->jsonResult("Webhooks:\n", $this->client->get('/webhooks/settings', [], $config)),
+                default            => $this->jsonResult("Webhooks:\n", $this->client->get(self::SETTINGS_PATH, [], $config)),
             },
         ));
     }
@@ -83,7 +85,7 @@ final class ZernioWebhooksTool extends AbstractZernioTool
         if ($missing !== null) {
             return new ToolResult(false, "create_webhook requires `{$missing}`.");
         }
-        return $this->jsonResult("Created webhook:\n", $this->client->post('/webhooks/settings', $payload, $config));
+        return $this->jsonResult("Created webhook:\n", $this->client->post(self::SETTINGS_PATH, $payload, $config));
     }
 
     /** @param array<string, mixed> $arguments */
@@ -95,7 +97,7 @@ final class ZernioWebhooksTool extends AbstractZernioTool
         }
         $payload             = $this->webhookWritePayload($arguments);
         $payload['_id']      = $id;
-        return $this->jsonResult("Updated webhook:\n", $this->client->put('/webhooks/settings', $payload, $config));
+        return $this->jsonResult("Updated webhook:\n", $this->client->put(self::SETTINGS_PATH, $payload, $config));
     }
 
     /** @param array<string, mixed> $arguments */
@@ -105,7 +107,7 @@ final class ZernioWebhooksTool extends AbstractZernioTool
         if ($id instanceof ToolResult) {
             return $id;
         }
-        $this->client->delete('/webhooks/settings', ['_id' => $id], $config);
+        $this->client->delete(self::SETTINGS_PATH, ['_id' => $id], $config);
         return new ToolResult(true, "Deleted webhook {$id}.", ['webhook_id' => $id]);
     }
 

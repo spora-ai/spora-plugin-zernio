@@ -112,6 +112,19 @@ final class ZernioQueueTool extends AbstractZernioTool
     /** @param array<string, mixed> $arguments */
     private function readPath(string $label, string $path, array $arguments, ZernioConfig $config): ToolResult
     {
+        $query = $this->queueReadQuery($arguments);
+        if ($query instanceof ToolResult) {
+            return $query;
+        }
+        return $this->jsonResult("{$label}:\n", $this->client->get($path, $query, $config));
+    }
+
+    /**
+     * @param  array<string, mixed> $arguments
+     * @return array<string, scalar|null>|ToolResult
+     */
+    private function queueReadQuery(array $arguments): array|ToolResult
+    {
         $profileId = $this->requireParam($arguments, 'profile_id', "{$this->getOperationName($arguments)} requires a profile_id.");
         if ($profileId instanceof ToolResult) {
             return $profileId;
@@ -124,7 +137,7 @@ final class ZernioQueueTool extends AbstractZernioTool
         if (isset($arguments['count'])) {
             $query['count'] = max(1, min(100, (int) $arguments['count']));
         }
-        return $this->jsonResult("{$label}:\n", $this->client->get($path, $query, $config));
+        return $query;
     }
 
     /** @param array<string, mixed> $arguments */
@@ -181,14 +194,7 @@ final class ZernioQueueTool extends AbstractZernioTool
         if ($name === '') {
             return new ToolResult(false, 'create_slot requires a queue `name` (e.g. "Evening Posts").');
         }
-        $slots = $this->buildSlots($arguments);
-        if ($slots instanceof ToolResult) {
-            return $slots;
-        }
-        if ($slots === []) {
-            return new ToolResult(false, 'A queue requires at least one slot. Pass `slots: [{dayOfWeek, time}, …]` or both `day` and `time`.');
-        }
-        return $this->buildQueuePayload($arguments, $name, $slots);
+        return $this->resolveQueuePayload($arguments, $name);
     }
 
     /**
@@ -197,26 +203,43 @@ final class ZernioQueueTool extends AbstractZernioTool
      */
     private function updateQueuePayload(array $arguments): array|ToolResult
     {
-        $slots = $this->buildSlots($arguments);
-        if ($slots instanceof ToolResult) {
-            return $slots;
-        }
-        if ($slots === []) {
-            return new ToolResult(false, 'A queue requires at least one slot. Pass `slots: [{dayOfWeek, time}, …]` or both `day` and `time`.');
-        }
-        return $this->buildQueuePayload($arguments, $this->arg($arguments, 'name'), $slots);
+        return $this->resolveQueuePayload($arguments, $this->arg($arguments, 'name'));
     }
 
     /**
-     * @param  list<array{dayOfWeek: int, time: string}> $slots
+     * @param  array<string, mixed> $arguments
      * @return array<string, mixed>|ToolResult
      */
-    private function buildQueuePayload(array $arguments, string $name, array $slots): array|ToolResult
+    private function resolveQueuePayload(array $arguments, string $name): array|ToolResult
     {
         $profileId = $this->requireParam($arguments, 'profile_id', 'A queue requires a profile_id.');
         if ($profileId instanceof ToolResult) {
             return $profileId;
         }
+        $slots = $this->buildSlots($arguments);
+        if ($slots instanceof ToolResult || $slots === []) {
+            return $this->slotsError($slots);
+        }
+        return $this->buildQueuePayload($arguments, $profileId, $name, $slots);
+    }
+
+    /**
+     * @param list<array{dayOfWeek: int, time: string}>|ToolResult $slots
+     */
+    private function slotsError(array|ToolResult $slots): ToolResult
+    {
+        if ($slots instanceof ToolResult) {
+            return $slots;
+        }
+        return new ToolResult(false, 'A queue requires at least one slot. Pass `slots: [{dayOfWeek, time}, …]` or both `day` and `time`.');
+    }
+
+    /**
+     * @param  list<array{dayOfWeek: int, time: string}> $slots
+     * @return array<string, mixed>
+     */
+    private function buildQueuePayload(array $arguments, string $profileId, string $name, array $slots): array
+    {
         $payload = ['profileId' => $profileId, 'slots' => $slots];
         if ($name !== '') {
             $payload['name'] = $name;
@@ -240,20 +263,39 @@ final class ZernioQueueTool extends AbstractZernioTool
         if (isset($arguments['slots']) && is_array($arguments['slots']) && $arguments['slots'] !== []) {
             return $this->parseSlotArray($arguments['slots']);
         }
-
         $day  = $this->arg($arguments, 'day');
         $time = $this->arg($arguments, 'time');
-        if ($day === '' && $time === '') {
-            return [];
-        }
-        if ($day === '' || $time === '') {
-            return new ToolResult(false, '`day` and `time` must both be provided (or pass `slots` directly).');
+        return $this->resolveSingleSlot($day, $time);
+    }
+
+    /**
+     * @return list<array{dayOfWeek: int, time: string}>|ToolResult
+     */
+    private function resolveSingleSlot(string $day, string $time): array|ToolResult
+    {
+        $missing = $this->singleSlotMissing($day, $time);
+        if ($missing !== null) {
+            return $missing;
         }
         $normalised = $this->normaliseSlot($day, $time);
         if ($normalised instanceof ToolResult) {
             return $normalised;
         }
         return [$normalised];
+    }
+
+    /**
+     * @return null|list<array{dayOfWeek: int, time: string}>|ToolResult
+     */
+    private function singleSlotMissing(string $day, string $time): null|array|ToolResult
+    {
+        if ($day === '' && $time === '') {
+            return [];
+        }
+        if ($day === '' || $time === '') {
+            return new ToolResult(false, '`day` and `time` must both be provided (or pass `slots` directly).');
+        }
+        return null;
     }
 
     /**
@@ -264,21 +306,29 @@ final class ZernioQueueTool extends AbstractZernioTool
     {
         $out = [];
         foreach ($entries as $entry) {
-            if (!is_array($entry)) {
-                return new ToolResult(false, 'Each entry in `slots` must be an object {dayOfWeek, time}.');
-            }
-            $day  = $entry['dayOfWeek'] ?? $entry['day_of_week'] ?? null;
-            $time = (string) ($entry['time'] ?? '');
-            if ($day === null || $time === '') {
-                return new ToolResult(false, 'Each slot must have both dayOfWeek (0-6) and time (HH:MM).');
-            }
-            $normalised = $this->normaliseSlot($day, $time);
+            $normalised = $this->normaliseSlotEntry($entry);
             if ($normalised instanceof ToolResult) {
                 return $normalised;
             }
             $out[] = $normalised;
         }
         return $out;
+    }
+
+    /**
+     * @return array{dayOfWeek: int, time: string}|ToolResult
+     */
+    private function normaliseSlotEntry(mixed $entry): array|ToolResult
+    {
+        if (!is_array($entry)) {
+            return new ToolResult(false, 'Each entry in `slots` must be an object {dayOfWeek, time}.');
+        }
+        $day  = $entry['dayOfWeek'] ?? $entry['day_of_week'] ?? null;
+        $time = (string) ($entry['time'] ?? '');
+        if ($day === null || $time === '') {
+            return new ToolResult(false, 'Each slot must have both dayOfWeek (0-6) and time (HH:MM).');
+        }
+        return $this->normaliseSlot($day, $time);
     }
 
     /**

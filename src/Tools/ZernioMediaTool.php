@@ -81,7 +81,42 @@ final class ZernioMediaTool extends AbstractZernioTool
     /** @param array<string, mixed> $arguments */
     private function uploadDirect(array $arguments, ZernioConfig $config): ToolResult
     {
-        $filename    = $this->requireParam($arguments, 'filename', 'upload_media requires a filename.');
+        $validated = $this->validateUploadArgs($arguments);
+        if ($validated instanceof ToolResult) {
+            return $validated;
+        }
+        $response = $this->client->post('/media/upload-direct', [
+            'filename'    => $validated['filename'],
+            'contentType' => $validated['contentType'],
+            'data'        => base64_encode($validated['bytes']),
+        ], $config);
+        return $this->jsonResult("Uploaded media:\n", $response);
+    }
+
+    /**
+     * @param  array<string, mixed> $arguments
+     * @return array{filename: string, contentType: string, bytes: string}|ToolResult
+     */
+    private function validateUploadArgs(array $arguments): array|ToolResult
+    {
+        $required = $this->requireUploadMetadata($arguments);
+        if ($required instanceof ToolResult) {
+            return $required;
+        }
+        $bytes = $this->requireUploadBytes($arguments);
+        if ($bytes instanceof ToolResult) {
+            return $bytes;
+        }
+        return ['filename' => $required['filename'], 'contentType' => $required['contentType'], 'bytes' => $bytes];
+    }
+
+    /**
+     * @param  array<string, mixed> $arguments
+     * @return array{filename: string, contentType: string}|ToolResult
+     */
+    private function requireUploadMetadata(array $arguments): array|ToolResult
+    {
+        $filename = $this->requireParam($arguments, 'filename', 'upload_media requires a filename.');
         if ($filename instanceof ToolResult) {
             return $filename;
         }
@@ -89,6 +124,15 @@ final class ZernioMediaTool extends AbstractZernioTool
         if ($contentType instanceof ToolResult) {
             return $contentType;
         }
+        return ['filename' => $filename, 'contentType' => $contentType];
+    }
+
+    /**
+     * @param  array<string, mixed> $arguments
+     * @return string|ToolResult
+     */
+    private function requireUploadBytes(array $arguments): string|ToolResult
+    {
         $b64 = (string) ($arguments['content'] ?? '');
         if ($b64 === '') {
             return new ToolResult(false, 'upload_media requires `content` (base64-encoded file bytes).');
@@ -97,11 +141,6 @@ final class ZernioMediaTool extends AbstractZernioTool
         if ($bytes === false) {
             return new ToolResult(false, 'upload_media `content` is not valid base64.');
         }
-        $response = $this->client->post('/media/upload-direct', [
-            'filename'    => $filename,
-            'contentType' => $contentType,
-            'data'        => base64_encode($bytes),
-        ], $config);
-        return $this->jsonResult("Uploaded media:\n", $response);
+        return $bytes;
     }
 }
