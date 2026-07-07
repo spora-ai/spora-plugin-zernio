@@ -28,6 +28,15 @@ final class PostPayloadBuilder
         if (isset($arguments['platforms']) && is_array($arguments['platforms']) && $arguments['platforms'] !== []) {
             return self::parseExplicitPlatforms($arguments['platforms']);
         }
+        return self::buildPlatformsFromAccountIds($arguments);
+    }
+
+    /**
+     * @param  array<string, mixed>          $arguments
+     * @return list<array<string, mixed>>|ToolResult
+     */
+    private static function buildPlatformsFromAccountIds(array $arguments): array|ToolResult
+    {
         $ids = $arguments['account_ids'] ?? null;
         if (!is_array($ids) || $ids === []) {
             return [];

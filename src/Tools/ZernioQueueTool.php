@@ -336,26 +336,51 @@ final class ZernioQueueTool extends AbstractZernioTool
      */
     private function normaliseSlot(mixed $day, string $time): array|ToolResult
     {
-        if (is_int($day) || (is_string($day) && ctype_digit($day))) {
-            $numeric = (int) $day;
-            if ($numeric < 0 || $numeric > 6) {
-                return new ToolResult(false, '`dayOfWeek` must be between 0 (Sunday) and 6 (Saturday).');
-            }
-            $dayOfWeek = $numeric;
-        } elseif (is_string($day)) {
-            $key = strtolower(trim($day));
-            if (!isset(self::DAY_NAMES[$key])) {
-                return new ToolResult(false, '`day` must be a name ("monday".."sunday") or a number 0-6.');
-            }
-            $dayOfWeek = self::DAY_NAMES[$key];
-        } else {
-            return new ToolResult(false, '`day` must be a string or integer.');
+        $dayOfWeek = $this->resolveDayOfWeek($day);
+        if ($dayOfWeek instanceof ToolResult) {
+            return $dayOfWeek;
         }
-
         if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time)) {
             return new ToolResult(false, '`time` must be in "HH:MM" 24h format.');
         }
         return ['dayOfWeek' => $dayOfWeek, 'time' => $time];
+    }
+
+    /**
+     * @return int|ToolResult
+     */
+    private function resolveDayOfWeek(mixed $day): int|ToolResult
+    {
+        if (is_int($day) || (is_string($day) && ctype_digit($day))) {
+            return $this->normaliseNumericDay((int) $day);
+        }
+        if (is_string($day)) {
+            return $this->normaliseNamedDay($day);
+        }
+        return new ToolResult(false, '`day` must be a string or integer.');
+    }
+
+    /**
+     * @return int|ToolResult
+     */
+    private function normaliseNumericDay(int $numeric): int|ToolResult
+    {
+        if ($numeric < 0 || $numeric > 6) {
+            return new ToolResult(false, '`dayOfWeek` must be between 0 (Sunday) and 6 (Saturday).');
+        }
+        return $numeric;
+    }
+
+    /**
+     * @return int|ToolResult
+     */
+    private function normaliseNamedDay(string $day): int|ToolResult
+    {
+        $key = strtolower(trim($day));
+        if (!isset(self::DAY_NAMES[$key])) {
+            return new ToolResult(false, '`day` must be a name ("monday".."sunday") or a number 0-6.');
+        }
+        return self::DAY_NAMES[$key];
     }
 
     /**
