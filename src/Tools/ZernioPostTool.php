@@ -282,15 +282,38 @@ final class ZernioPostTool extends AbstractZernioTool
         if ($postId instanceof ToolResult) {
             return $postId;
         }
-        $payload = $this->buildUpdatePayload($arguments);
+        $payload = $this->resolveUpdatePayload($arguments);
         if ($payload instanceof ToolResult) {
             return $payload;
         }
-        if ($payload === []) {
-            return new ToolResult(false, 'update_post requires at least one of content, title, tags, hashtags, mentions, scheduled_for, timezone, is_draft, media_items, recycling.');
+        return $this->jsonResult(
+            "Updated post:\n",
+            $this->client->put(self::POST_PATH . rawurlencode($postId), $payload, $config),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed> $arguments
+     * @return array<string, mixed>|ToolResult
+     */
+    private function resolveUpdatePayload(array $arguments): array|ToolResult
+    {
+        $payload = $this->buildUpdatePayload($arguments);
+        if ($payload instanceof ToolResult || $payload === []) {
+            return $this->emptyUpdateError($payload);
         }
-        $response = $this->client->put(self::POST_PATH . rawurlencode($postId), $payload, $config);
-        return $this->jsonResult("Updated post:\n", $response);
+        return $payload;
+    }
+
+    /**
+     * @param array<string, mixed>|ToolResult $payload
+     */
+    private function emptyUpdateError(array|ToolResult $payload): ToolResult
+    {
+        if ($payload instanceof ToolResult) {
+            return $payload;
+        }
+        return new ToolResult(false, 'update_post requires at least one of content, title, tags, hashtags, mentions, scheduled_for, timezone, is_draft, media_items, recycling.');
     }
 
     /**
