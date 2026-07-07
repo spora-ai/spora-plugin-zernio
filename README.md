@@ -25,7 +25,7 @@ Each tool exposes three settings (configurable globally, per user, or per agent 
 | `http_timeout` | text | `30` | Per-request timeout in seconds. Falls back to `SPORA_TOOL_HTTP_TIMEOUT`. |
 
 If `api_key` is left blank, the tools fall back to the **`ZERNIO_API_KEY`** environment variable —
-so a self-hosted operator can set one key for all four Zernio tools instead of configuring each.
+so a self-hosted operator can set one key for all seven Zernio tools instead of configuring each.
 
 Create an API key in your Zernio dashboard (`Settings → API keys`). Keys are shown only once.
 
@@ -47,7 +47,7 @@ Use this first to obtain the `account_ids` and platforms to target.
 
 | Operation | Approval | Purpose |
 |---|---|---|
-| `create_post` | ✅ | Create a post. `publish_now: true` publishes immediately; `scheduled_for` + `timezone` schedules; neither saves a draft. Accepts `account_ids` (required), `content` (required), and optional `media_urls` (public URLs). |
+| `create_post` | ✅ | Create a post. `publish_now: true` publishes immediately; `scheduled_for` + `timezone` schedules; neither saves a draft. Accepts `platforms` (per-platform targets, preferred) or `account_ids` + `platform`, `content` (required unless `media_items` or `customContent` cover every platform), and optional `media_items` ([{url, type (image\|video), thumbnailUrl?, alt?}, …]). |
 | `list_posts` | — | List posts (filter by `status`, `profile_id`). |
 | `get_post` | — | Get a single post by `post_id`. |
 | `delete_post` | ✅ | Delete a post by `post_id`. |

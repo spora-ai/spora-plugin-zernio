@@ -425,9 +425,10 @@ it('uploads a CSV via POST /posts/bulk-upload with dryRun=false by default', fun
     $http = Mockery::mock(HttpClientInterface::class);
     $http->expects('request')
         ->with('POST', 'https://zernio.com/api/v1/posts/bulk-upload', Mockery::on(function (array $o): bool {
-            $json = $o['json'];
-            return is_string($json['body'] ?? null)
-                && str_starts_with($json['body'], 'content,account_id');
+            return !isset($o['json'])
+                && is_string($o['body'] ?? null)
+                && str_starts_with($o['body'], 'content,account_id')
+                && ($o['headers']['Content-Type'] ?? null) === 'text/csv';
         }))
         ->andReturn(zernioResponse(200, '{"total":5,"valid":5,"invalid":0}'));
 

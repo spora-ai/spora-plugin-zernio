@@ -56,6 +56,24 @@ final class ZernioClient
     }
 
     /**
+     * POST a raw string body (e.g. text/csv for bulk-upload) with an explicit
+     * Content-Type header. Use this instead of {@see self::post} when the
+     * endpoint consumes a non-JSON body.
+     *
+     * @return array<string, mixed>
+     */
+    public function postRaw(string $path, string $body, string $contentType, ZernioConfig $config, array $headers = []): array
+    {
+        return $this->request(
+            'POST',
+            $path,
+            ['body' => $body, 'headers' => ['Content-Type' => $contentType]],
+            $config,
+            $headers,
+        );
+    }
+
+    /**
      * @param  array<string, mixed>      $body
      * @param  array<string, string>     $headers Extra headers to merge in.
      * @return array<string, mixed>
@@ -93,13 +111,15 @@ final class ZernioClient
     private function request(string $method, string $path, array $options, ZernioConfig $config, array $headers = []): array
     {
         $url = rtrim($config->baseUrl, '/') . '/' . ltrim($path, '/');
-        $requestOptions = array_merge($options, [
+        $optionHeaders = is_array($options['headers'] ?? null) ? $options['headers'] : [];
+        unset($options['headers']);
+        $requestOptions = $options + [
             'headers' => array_merge([
                 'Authorization' => 'Bearer ' . $config->apiKey,
                 'Accept'        => 'application/json',
-            ], $headers),
+            ], $optionHeaders, $headers),
             'timeout' => $config->timeout,
-        ]);
+        ];
 
         for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++) {
             $this->logRequest($method, $url, $attempt, $config->timeout);

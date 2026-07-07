@@ -283,8 +283,11 @@ final class ZernioPostTool extends AbstractZernioTool
             return $postId;
         }
         $payload = $this->buildUpdatePayload($arguments);
+        if ($payload instanceof ToolResult) {
+            return $payload;
+        }
         if ($payload === []) {
-            return new ToolResult(false, 'update_post requires at least one of content, title, tags, hashtags, mentions, scheduled_for, is_draft, media_items, recycling.');
+            return new ToolResult(false, 'update_post requires at least one of content, title, tags, hashtags, mentions, scheduled_for, timezone, is_draft, media_items, recycling.');
         }
         $response = $this->client->put(self::POST_PATH . rawurlencode($postId), $payload, $config);
         return $this->jsonResult("Updated post:\n", $response);
@@ -292,9 +295,9 @@ final class ZernioPostTool extends AbstractZernioTool
 
     /**
      * @param array<string, mixed> $arguments
-     * @return array<string, mixed>
+     * @return array<string, mixed>|ToolResult
      */
-    private function buildUpdatePayload(array $arguments): array
+    private function buildUpdatePayload(array $arguments): array|ToolResult
     {
         $payload = [];
         foreach (['content' => 'content', 'title' => 'title'] as $arg => $field) {
@@ -309,7 +312,7 @@ final class ZernioPostTool extends AbstractZernioTool
         $payload += PostPayloadBuilder::stringListPayload($arguments, ['tags' => 'tags', 'hashtags' => 'hashtags', 'mentions' => 'mentions']);
         $scheduling = PostPayloadBuilder::schedulingPayload($arguments);
         if ($scheduling instanceof ToolResult) {
-            return $payload;
+            return $scheduling;
         }
         $payload = array_merge($payload, $scheduling);
         if (array_key_exists('is_draft', $arguments)) {
@@ -433,9 +436,10 @@ final class ZernioPostTool extends AbstractZernioTool
             return new ToolResult(false, 'bulk_upload requires csv_content.');
         }
         $dryRun   = (bool) ($arguments['dry_run'] ?? false);
-        $response = $this->client->post(
+        $response = $this->client->postRaw(
             self::BULK_UPLOAD_PATH . ($dryRun ? '?dryRun=true' : ''),
-            ['headers' => ['Content-Type' => 'text/csv'], 'body' => $csv],
+            $csv,
+            'text/csv',
             $config,
         );
         return $this->jsonResult("Bulk upload:\n", $response);

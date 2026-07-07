@@ -21,9 +21,10 @@ use Spora\Tools\ValueObjects\ToolResult;
  *   3. Use the returned `public_url` in `media_items[].url` when creating
  *      a post.
  *
- * For small files, `upload_media` accepts the raw bytes in `content` and
- * POSTs them to `/v1/media/upload-direct` (multipart). Max 5 GB; restricted
- * to a list of MIME types documented at https://docs.zernio.com/.
+ * For small files, `upload_media` accepts base64-encoded bytes in `content`,
+ * decodes them, and forwards them as a JSON `data` field (base64-encoded
+ * again) in the body of POST `/v1/media/upload-direct`. The round-trip
+ * avoids the multipart path because ZernioClient::post always sends JSON.
  */
 #[Tool(
     name: 'zernio_media',
@@ -32,14 +33,14 @@ use Spora\Tools\ValueObjects\ToolResult;
     category: 'social-media',
 )]
 #[ToolOperation(name: 'presign_media', description: 'Get a presigned S3 URL for uploading a file', enabledByDefault: true, requiresApprovalByDefault: true)]
-#[ToolOperation(name: 'upload_media', description: 'Upload a small file directly to Zernio (multipart)', enabledByDefault: true, requiresApprovalByDefault: true)]
+#[ToolOperation(name: 'upload_media', description: 'Upload a small file directly to Zernio (JSON body, base64 in `data`)', enabledByDefault: true, requiresApprovalByDefault: true)]
 #[ToolSetting(key: 'api_key', label: 'Zernio API Key', type: 'password', description: 'Bearer token for the Zernio API. Falls back to the ZERNIO_API_KEY environment variable.', required: false)]
 #[ToolSetting(key: 'base_url', label: 'Base URL', type: 'text', description: 'Zernio API base URL (default: https://zernio.com/api/v1).', default: 'https://zernio.com/api/v1')]
 #[ToolSetting(key: 'http_timeout', label: 'HTTP Timeout', type: 'text', description: 'Seconds before an HTTP request fails (default: 30).')]
 #[ToolParameter(name: 'filename', type: 'string', description: 'Original filename, e.g. "hero.jpg".', required: false)]
 #[ToolParameter(name: 'content_type', type: 'string', description: 'MIME type, e.g. "image/jpeg", "video/mp4". Must be one of the supported types (see Zernio docs).', required: false)]
 #[ToolParameter(name: 'size', type: 'integer', description: 'File size in bytes (optional; helps Zernio reserve storage).', required: false)]
-#[ToolParameter(name: 'content', type: 'string', description: 'Base64-encoded file contents for upload_media. The plugin decodes and forwards the raw bytes.', required: false)]
+#[ToolParameter(name: 'content', type: 'string', description: 'Base64-encoded file contents for upload_media. The plugin decodes them and re-encodes them as a JSON `data` field.', required: false)]
 final class ZernioMediaTool extends AbstractZernioTool
 {
     public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
