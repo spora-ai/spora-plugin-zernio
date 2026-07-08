@@ -1,41 +1,9 @@
-# Zernio Plugin for Spora
+# spora-plugin-zernio
 
-Social-media scheduling and publishing for [Spora](https://github.com/spora-ai/spora-core)
-agents, powered by the [Zernio](https://docs.zernio.com/) API. Lets an agent discover connected
-social accounts, and draft, schedule, or publish posts across 15+ networks (Twitter/X, Instagram,
-Facebook, LinkedIn, TikTok, YouTube, Bluesky, Threads, Telegram, Discord, and more).
+Spora plugin: zernio. The full reference (install, configuration,
+per-tool parameters, development) has moved to the docs site:
 
-> **Status:** baseline scaffold. The social-media tools (accounts discovery, post
-> create/schedule/publish, queue, analytics) land in the follow-up implementation PR.
+**[docs.spora-ai.com/develop/plugins/reference/zernio](https://docs.spora-ai.com/develop/plugins/reference/zernio)**
 
-## Installation
-
-```bash
-php bin/spora plugin:install spora-ai/spora-plugin-zernio
-```
-
-For local development, install from a path repository or point `SPORA_PLUGINS_PATHS` at a checkout.
-
-## Configuration
-
-The Zernio API key is read from the tool settings (`api_key`) or, as a fallback, the
-`ZERNIO_API_KEY` environment variable — so a self-hosted operator can configure one key for all
-Zernio tools. The key is stored encrypted and is never sent to the LLM or written to logs.
-
-## Development
-
-```bash
-composer install
-composer test      # Pest
-composer analyse   # PHPStan level 5
-composer lint      # php-cs-fixer dry-run
-```
-
-## CI
-
-Pest (PHP 8.4 + 8.5), PHPStan, php-cs-fixer, coverage, and a SonarCloud scan run on every push to
-`main`, on `v*` tags, and on pull requests. External actions are pinned to full commit SHAs.
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+See the docs site for the canonical reference. The README previously
+in this repo has been migrated there.
