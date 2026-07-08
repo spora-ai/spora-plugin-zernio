@@ -5,15 +5,21 @@ declare(strict_types=1);
 namespace Spora\Plugins\Zernio;
 
 use Spora\Plugins\AbstractPlugin;
-use Spora\Plugins\Zernio\Tools\EchoTool;
+use Spora\Plugins\Zernio\Tools\ZernioAccountsTool;
+use Spora\Plugins\Zernio\Tools\ZernioAnalyticsTool;
+use Spora\Plugins\Zernio\Tools\ZernioMediaTool;
+use Spora\Plugins\Zernio\Tools\ZernioPostTool;
+use Spora\Plugins\Zernio\Tools\ZernioQueueTool;
+use Spora\Plugins\Zernio\Tools\ZernioValidateTool;
+use Spora\Plugins\Zernio\Tools\ZernioWebhooksTool;
 
 /**
  * Zernio plugin entry point.
  *
  * Extends {@see AbstractPlugin} so we only override the hooks we use
  * (getName() and tools()); the base class supplies no-op defaults for the
- * rest. The real social-media tools land in the follow-up implementation PR;
- * this baseline ships a placeholder tool so the package boots and CI is green.
+ * rest. Each tool's constructor takes only container-resolvable types, so
+ * PHP-DI autowires them — no register() binding is required.
  */
 final class ZernioPlugin extends AbstractPlugin
 {
@@ -26,7 +32,13 @@ final class ZernioPlugin extends AbstractPlugin
     public function tools(): array
     {
         return [
-            EchoTool::class,
+            ZernioAccountsTool::class,
+            ZernioPostTool::class,
+            ZernioQueueTool::class,
+            ZernioAnalyticsTool::class,
+            ZernioMediaTool::class,
+            ZernioWebhooksTool::class,
+            ZernioValidateTool::class,
         ];
     }
 }
