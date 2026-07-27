@@ -37,10 +37,10 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolSetting(key: 'api_key', label: 'Zernio API Key', type: 'password', description: 'Bearer token for the Zernio API. Falls back to the ZERNIO_API_KEY environment variable.', required: false)]
 #[ToolSetting(key: 'base_url', label: 'Base URL', type: 'text', description: 'Zernio API base URL (default: https://zernio.com/api/v1).', default: 'https://zernio.com/api/v1')]
 #[ToolSetting(key: 'http_timeout', label: 'HTTP Timeout', type: 'text', description: 'Seconds before an HTTP request fails (default: 30).')]
-#[ToolParameter(name: 'filename', type: 'string', description: 'Original filename, e.g. "hero.jpg".', required: false)]
-#[ToolParameter(name: 'content_type', type: 'string', description: 'MIME type, e.g. "image/jpeg", "video/mp4". Must be one of the supported types (see Zernio docs).', required: false)]
+#[ToolParameter(name: 'filename', type: 'string', description: 'Original filename, e.g. "hero.jpg".', required: ['presign_media', 'upload_media'])]
+#[ToolParameter(name: 'content_type', type: 'string', description: 'MIME type, e.g. "image/jpeg", "video/mp4". Must be one of the supported types (see Zernio docs).', required: ['presign_media', 'upload_media'])]
 #[ToolParameter(name: 'size', type: 'integer', description: 'File size in bytes (optional; helps Zernio reserve storage).', required: false)]
-#[ToolParameter(name: 'content', type: 'string', description: 'Base64-encoded file contents for upload_media. The plugin decodes them and re-encodes them as a JSON `data` field.', required: false)]
+#[ToolParameter(name: 'content', type: 'string', description: 'Base64-encoded file contents for upload_media. The plugin decodes them and re-encodes them as a JSON `data` field.', required: ['upload_media'])]
 final class ZernioMediaTool extends AbstractZernioTool
 {
     public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
