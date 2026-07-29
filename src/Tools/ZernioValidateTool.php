@@ -30,11 +30,11 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolSetting(key: 'api_key', label: 'Zernio API Key', type: 'password', description: 'Bearer token for the Zernio API. Falls back to the ZERNIO_API_KEY environment variable.', required: false)]
 #[ToolSetting(key: 'base_url', label: 'Base URL', type: 'text', description: 'Zernio API base URL (default: https://zernio.com/api/v1).', default: 'https://zernio.com/api/v1')]
 #[ToolSetting(key: 'http_timeout', label: 'HTTP Timeout', type: 'text', description: 'Seconds before an HTTP request fails (default: 30).')]
-#[ToolParameter(name: 'content', type: 'string', description: 'Post text to validate.', required: false)]
+#[ToolParameter(name: 'content', type: 'string', description: 'Post text to validate. Required for validate_post_length; optional for validate_post.', required: ['validate_post_length'])]
 #[ToolParameter(name: 'media_items', type: 'array', description: 'Media items to validate: [{url, type}, …].', required: false, items: ['type' => 'object'])]
-#[ToolParameter(name: 'platform', type: 'string', description: 'Target platform (e.g. "twitter", "instagram", "linkedin") for validate_post / validate_post_length.', required: false)]
-#[ToolParameter(name: 'url', type: 'string', description: 'Media URL to reachability-check.', required: false)]
-#[ToolParameter(name: 'subreddit', type: 'string', description: 'Subreddit name (without "r/") to verify exists.', required: false)]
+#[ToolParameter(name: 'platform', type: 'string', description: 'Target platform (e.g. "twitter", "instagram", "linkedin"). Required for validate_post_length; optional for validate_post.', required: ['validate_post_length'])]
+#[ToolParameter(name: 'url', type: 'string', description: 'Media URL to reachability-check.', required: ['validate_media'])]
+#[ToolParameter(name: 'subreddit', type: 'string', description: 'Subreddit name (without "r/") to verify exists.', required: ['validate_subreddit'])]
 final class ZernioValidateTool extends AbstractZernioTool
 {
     public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
