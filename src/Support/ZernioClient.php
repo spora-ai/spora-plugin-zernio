@@ -16,7 +16,10 @@ use Throwable;
  *
  * - Adds `Authorization: Bearer <api_key>` and JSON headers to every request.
  * - Joins the configured base URL with the endpoint path.
- * - Retries twice on HTTP 429 / 5xx with a short backoff.
+ * - Single-shot: every failure surfaces to the caller so the LLM can decide
+ *   whether to retry. Earlier versions retried twice on 429/5xx — that was
+ *   dangerous for this plugin: a social-media POST that retried on a transport
+ *   timeout after the server had already committed the publish would double-post.
  * - Redacts the API key from all log entries.
  * - Decodes JSON responses to an array (empty body — e.g. a 204 from DELETE —
  *   decodes to []), and raises {@see ZernioApiException} on transport failure,
@@ -27,9 +30,6 @@ use Throwable;
  */
 final class ZernioClient
 {
-    private const RETRYABLE_HTTP_CODES = [429, 500, 502, 503, 504];
-    private const MAX_ATTEMPTS = 3;
-
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly ?LoggerInterface $logger = null,
@@ -121,38 +121,22 @@ final class ZernioClient
             'timeout' => $config->timeout,
         ];
 
-        for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++) {
-            $this->logRequest($method, $url, $attempt, $config->timeout);
+        $this->logRequest($method, $url, $config->timeout);
 
-            try {
-                $response = $this->httpClient->request($method, $url, $requestOptions);
-                $status   = $response->getStatusCode();
-
-                if ($this->isRetryable($status, $attempt) && $attempt < self::MAX_ATTEMPTS) {
-                    usleep($this->backoffMicroseconds($attempt));
-                    continue;
-                }
-
-                return $this->decode($response, $status, $url);
-            } catch (TransportExceptionInterface $e) {
-                if ($attempt >= self::MAX_ATTEMPTS) {
-                    throw $this->transportFailure($url, $e);
-                }
-                usleep($this->backoffMicroseconds($attempt));
-            }
+        try {
+            $response = $this->httpClient->request($method, $url, $requestOptions);
+            return $this->decode($response, $response->getStatusCode(), $url);
+        } catch (TransportExceptionInterface $e) {
+            throw $this->transportFailure($url, $e);
         }
-
-        // Unreachable: the loop always returns or throws, but PHP needs a return.
-        throw new ZernioApiException('Zernio API request failed: exhausted retries.');
     }
 
-    private function logRequest(string $method, string $url, int $attempt, int $timeout): void
+    private function logRequest(string $method, string $url, int $timeout): void
     {
         // API key intentionally omitted — never log credentials.
         $this->logger?->debug('ZernioClient: request', [
             'method'  => $method,
             'url'     => $url,
-            'attempt' => $attempt,
             'timeout' => $timeout,
         ]);
     }
@@ -193,20 +177,6 @@ final class ZernioClient
     {
         $this->logger?->error('ZernioClient: transport error', ['url' => $url, 'error' => $e->getMessage()]);
         return new ZernioApiException('Zernio API request failed: ' . $e->getMessage());
-    }
-
-    private function isRetryable(int $status, int $attempt): bool
-    {
-        return $attempt < self::MAX_ATTEMPTS && in_array($status, self::RETRYABLE_HTTP_CODES, true);
-    }
-
-    private function backoffMicroseconds(int $attempt): int
-    {
-        return match ($attempt) {
-            1 => 250_000,
-            2 => 750_000,
-            default => 0,
-        };
     }
 
     private function truncate(string $content, int $maxChars = 500): string

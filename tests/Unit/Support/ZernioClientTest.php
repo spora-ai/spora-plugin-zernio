@@ -140,21 +140,21 @@ it('throws when the body is not valid JSON', function (): void {
         ->toThrow(ZernioApiException::class);
 });
 
-it('retries once on a 503 and then succeeds', function (): void {
+it('does not retry on a 503 and surfaces the HTTP status', function (): void {
     $http = Mockery::mock(HttpClientInterface::class);
-    $http->expects('request')->twice()
-        ->andReturn(zernioResponse(503, ''), zernioResponse(200, '{"ok":true}'));
+    $http->expects('request')->once()->andReturn(zernioResponse(503, 'service unavailable'));
 
     $client = new ZernioClient($http);
 
-    expect($client->get('/queue/slots', [], zernioTestConfig()))->toBe(['ok' => true]);
+    expect(fn() => $client->get('/queue/slots', [], zernioTestConfig()))
+        ->toThrow(ZernioApiException::class, 'HTTP 503');
 });
 
-it('wraps a transport exception in a ZernioApiException after exhausting retries', function (): void {
+it('wraps a transport exception in a ZernioApiException without retrying', function (): void {
     $transport = new class ('boom') extends RuntimeException implements TransportExceptionInterface {};
 
     $http = Mockery::mock(HttpClientInterface::class);
-    $http->expects('request')->times(3)->andThrow($transport);
+    $http->expects('request')->once()->andThrow($transport);
 
     $client = new ZernioClient($http);
 

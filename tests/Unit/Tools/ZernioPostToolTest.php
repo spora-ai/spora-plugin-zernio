@@ -479,7 +479,6 @@ it('appends dryRun=true to /posts/bulk-upload when requested', function (): void
 // ---------------------------------------------------------------------------
 
 it('surfaces an API error as a failed ToolResult without throwing', function (): void {
-    // 502 is retryable, so the client attempts it MAX_ATTEMPTS times before failing.
     $http = Mockery::mock(HttpClientInterface::class);
     $http->allows('request')->andReturn(zernioResponse(502, 'bad gateway'));
 
