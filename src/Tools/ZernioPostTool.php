@@ -10,6 +10,7 @@ use Spora\Tools\Attributes\Tool;
 use Spora\Tools\Attributes\ToolOperation;
 use Spora\Tools\Attributes\ToolParameter;
 use Spora\Tools\Attributes\ToolSetting;
+use Spora\Services\PrincipalContext;
 use Spora\Tools\ValueObjects\ToolResult;
 
 /**
@@ -102,7 +103,13 @@ final class ZernioPostTool extends AbstractZernioTool
     private const SYNC_EXTERNAL_PATH  = '/posts/sync-external';
     private const STRING_ARRAY_TYPE   = 'string[]';
 
-    public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
+    public function execute(
+        array $arguments,
+        int $agentId,
+        ?int $userId = null,
+        ?int $taskId = null,
+        ?PrincipalContext $context = null,
+    ): ToolResult
     {
         return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
             fn(): ToolResult => match ($this->getOperationName($arguments)) {

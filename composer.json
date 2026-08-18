@@ -5,7 +5,7 @@
   "license": "MIT",
   "require": {
     "php": "^8.4.1",
-    "spora-ai/spora-core": ">=0.12.0 <2.0.0"
+    "spora-ai/spora-core": ">=0.15.0 <2.0.0 || @dev"
   },
   "require-dev": {
     "friendsofphp/php-cs-fixer": "^3.94",
@@ -37,6 +37,15 @@
       "spora-ai/installer": true
     }
   },
-  "minimum-stability": "stable",
+  "repositories": [
+    {
+      "type": "path",
+      "url": "../spora-core",
+      "options": {
+        "symlink": true
+      }
+    }
+  ],
+  "minimum-stability": "dev",
   "prefer-stable": true
 }
