@@ -59,7 +59,8 @@ final class ZernioWebhooksTool extends AbstractZernioTool
         ?int $taskId = null,
         ?PrincipalContext $context = null,
     ): ToolResult {
-        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+        $ownerId = $context->ownerUserId ?? $userId;
+        return $this->withConfig($agentId, $ownerId, fn(ZernioConfig $config): ToolResult => $this->guard(
             fn(): ToolResult => match ($this->getOperationName($arguments)) {
                 'create_webhook'   => $this->createWebhook($arguments, $config),
                 'update_webhook'   => $this->updateWebhook($arguments, $config),

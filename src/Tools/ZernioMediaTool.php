@@ -51,7 +51,8 @@ final class ZernioMediaTool extends AbstractZernioTool
         ?int $taskId = null,
         ?PrincipalContext $context = null,
     ): ToolResult {
-        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+        $ownerId = $context->ownerUserId ?? $userId;
+        return $this->withConfig($agentId, $ownerId, fn(ZernioConfig $config): ToolResult => $this->guard(
             fn(): ToolResult => match ($this->getOperationName($arguments)) {
                 'upload_media' => $this->uploadDirect($arguments, $config),
                 default        => $this->presign($arguments, $config),

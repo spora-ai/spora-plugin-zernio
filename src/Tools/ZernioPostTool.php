@@ -109,7 +109,8 @@ final class ZernioPostTool extends AbstractZernioTool
         ?int $taskId = null,
         ?PrincipalContext $context = null,
     ): ToolResult {
-        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+        $ownerId = $context->ownerUserId ?? $userId;
+        return $this->withConfig($agentId, $ownerId, fn(ZernioConfig $config): ToolResult => $this->guard(
             fn(): ToolResult => match ($this->getOperationName($arguments)) {
                 'list_posts'           => $this->listPosts($arguments, $config),
                 'get_post'             => $this->getById($arguments, $config, self::POST_PATH, 'post_id', 'get_post'),

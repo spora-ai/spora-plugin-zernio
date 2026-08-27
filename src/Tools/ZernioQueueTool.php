@@ -65,7 +65,8 @@ final class ZernioQueueTool extends AbstractZernioTool
         ?int $taskId = null,
         ?PrincipalContext $context = null,
     ): ToolResult {
-        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+        $ownerId = $context->ownerUserId ?? $userId;
+        return $this->withConfig($agentId, $ownerId, fn(ZernioConfig $config): ToolResult => $this->guard(
             fn(): ToolResult => match ($this->getOperationName($arguments)) {
                 'preview_queue' => $this->readPath('Queue preview', '/queue/preview', $arguments, $config),
                 'next_slot'     => $this->readPath('Next slot', '/queue/next-slot', $arguments, $config),

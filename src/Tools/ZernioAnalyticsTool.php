@@ -63,7 +63,8 @@ final class ZernioAnalyticsTool extends AbstractZernioTool
         ?int $taskId = null,
         ?PrincipalContext $context = null,
     ): ToolResult {
-        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+        $ownerId = $context->ownerUserId ?? $userId;
+        return $this->withConfig($agentId, $ownerId, fn(ZernioConfig $config): ToolResult => $this->guard(
             fn(): ToolResult => match ($this->getOperationName($arguments)) {
                 'follower_analytics' => $this->followerAnalytics($arguments, $config),
                 'best_time_to_post'  => $this->bestTimeToPost($arguments, $config),

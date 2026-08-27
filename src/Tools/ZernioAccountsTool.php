@@ -66,7 +66,8 @@ final class ZernioAccountsTool extends AbstractZernioTool
         ?int $taskId = null,
         ?PrincipalContext $context = null,
     ): ToolResult {
-        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+        $ownerId = $context->ownerUserId ?? $userId;
+        return $this->withConfig($agentId, $ownerId, fn(ZernioConfig $config): ToolResult => $this->guard(
             fn(): ToolResult => match ($this->getOperationName($arguments)) {
                 'list_profiles'      => $this->formatList('Profiles', $this->listProfiles($arguments, $config), 'profiles'),
                 'create_profile'     => $this->createProfile($arguments, $config),
