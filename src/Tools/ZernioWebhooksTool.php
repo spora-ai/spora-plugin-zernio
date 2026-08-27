@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Spora\Plugins\Zernio\Tools;
 
 use Spora\Plugins\Zernio\Support\ZernioConfig;
+use Spora\Services\PrincipalContext;
 use Spora\Tools\Attributes\Tool;
 use Spora\Tools\Attributes\ToolOperation;
 use Spora\Tools\Attributes\ToolParameter;
 use Spora\Tools\Attributes\ToolSetting;
-use Spora\Services\PrincipalContext;
 use Spora\Tools\ValueObjects\ToolResult;
 
 /**
@@ -58,8 +58,7 @@ final class ZernioWebhooksTool extends AbstractZernioTool
         ?int $userId = null,
         ?int $taskId = null,
         ?PrincipalContext $context = null,
-    ): ToolResult
-    {
+    ): ToolResult {
         return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
             fn(): ToolResult => match ($this->getOperationName($arguments)) {
                 'create_webhook'   => $this->createWebhook($arguments, $config),
