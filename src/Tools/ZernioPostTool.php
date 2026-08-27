@@ -6,6 +6,7 @@ namespace Spora\Plugins\Zernio\Tools;
 
 use Spora\Plugins\Zernio\Support\PostPayloadBuilder;
 use Spora\Plugins\Zernio\Support\ZernioConfig;
+use Spora\Services\PrincipalContext;
 use Spora\Tools\Attributes\Tool;
 use Spora\Tools\Attributes\ToolOperation;
 use Spora\Tools\Attributes\ToolParameter;
@@ -44,14 +45,14 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolSetting(key: 'base_url', label: 'Base URL', type: 'text', description: 'Zernio API base URL (default: https://zernio.com/api/v1).', default: 'https://zernio.com/api/v1')]
 #[ToolSetting(key: 'http_timeout', label: 'HTTP Timeout', type: 'text', description: 'Seconds before an HTTP request fails (default: 30).')]
 #[ToolParameter(name: 'platforms', type: 'array', description: 'Per-platform targets: [{platform, accountId, customContent?, customMedia[]?, scheduledFor?, platformSpecificData?}, …]. Preferred over account_ids for new integrations.', required: false, items: ['type' => 'object'])]
-#[ToolParameter(name: 'account_ids', type: self::STRING_ARRAY_TYPE, description: 'Convenience: a flat list of account IDs. Combined with `platform` to build the platforms[] array. Use either account_ids + platform OR platforms, not both.', required: false, items: ['type' => 'string'])]
+#[ToolParameter(name: 'account_ids', type: 'array', description: 'Convenience: a flat list of account IDs. Combined with `platform` to build the platforms[] array. Use either account_ids + platform OR platforms, not both.', required: false, items: ['type' => 'string'])]
 #[ToolParameter(name: 'platform', type: 'string', description: 'Platform name used when account_ids is given (e.g. "twitter", "instagram", "linkedin"). Ignored if `platforms` is set.', required: false)]
 #[ToolParameter(name: 'content', type: 'string', description: 'The text content of the post. Required for create_post unless media_items are attached or every platform has customContent.', required: false)]
 #[ToolParameter(name: 'title', type: 'string', description: 'Optional post title (e.g. used by YouTube).', required: false)]
 #[ToolParameter(name: 'media_items', type: 'array', description: 'Media to attach: [{url, type ("image"|"video"), thumbnailUrl?, alt?}, …].', required: false, items: ['type' => 'object'])]
-#[ToolParameter(name: 'tags', type: self::STRING_ARRAY_TYPE, description: 'Tags/keywords for the post.', required: false, items: ['type' => 'string'])]
-#[ToolParameter(name: 'hashtags', type: self::STRING_ARRAY_TYPE, description: 'Hashtags to add to the post.', required: false, items: ['type' => 'string'])]
-#[ToolParameter(name: 'mentions', type: self::STRING_ARRAY_TYPE, description: 'Mention identifiers (stored for reference; for LinkedIn @mentions use get_account_health → linkedin-mentions).', required: false, items: ['type' => 'string'])]
+#[ToolParameter(name: 'tags', type: 'array', description: 'Tags/keywords for the post.', required: false, items: ['type' => 'string'])]
+#[ToolParameter(name: 'hashtags', type: 'array', description: 'Hashtags to add to the post.', required: false, items: ['type' => 'string'])]
+#[ToolParameter(name: 'mentions', type: 'array', description: 'Mention identifiers (stored for reference; for LinkedIn @mentions use get_account_health → linkedin-mentions).', required: false, items: ['type' => 'string'])]
 #[ToolParameter(name: 'scheduled_for', type: 'string', description: 'ISO-8601 datetime to schedule the post for (requires timezone). Omit for draft or publish_now. Do not combine with queued_from_profile.', required: false)]
 #[ToolParameter(name: 'timezone', type: 'string', description: 'IANA timezone for scheduled_for, e.g. "Europe/Berlin".', required: false)]
 #[ToolParameter(name: 'publish_now', type: 'boolean', description: 'Publish immediately instead of scheduling or drafting.', required: false, default: false)]
@@ -79,7 +80,7 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolParameter(name: 'video_id', type: 'string', description: 'YouTube video ID for update_post_metadata (alternative to post_id-based update).', required: false)]
 #[ToolParameter(name: 'yt_title', type: 'string', description: 'YouTube video title for update_post_metadata.', required: false)]
 #[ToolParameter(name: 'yt_description', type: 'string', description: 'YouTube video description for update_post_metadata.', required: false)]
-#[ToolParameter(name: 'yt_tags', type: self::STRING_ARRAY_TYPE, description: 'YouTube video tags for update_post_metadata (combined ≤500 chars, each ≤100).', required: false, items: ['type' => 'string'])]
+#[ToolParameter(name: 'yt_tags', type: 'array', description: 'YouTube video tags for update_post_metadata (combined ≤500 chars, each ≤100).', required: false, items: ['type' => 'string'])]
 #[ToolParameter(name: 'yt_category_id', type: 'string', description: 'YouTube category ID for update_post_metadata.', required: false)]
 #[ToolParameter(name: 'yt_privacy_status', type: 'string', description: 'YouTube privacy status: public, private, unlisted.', required: false)]
 #[ToolParameter(name: 'yt_thumbnail_url', type: 'string', description: 'YouTube thumbnail image URL for update_post_metadata.', required: false)]
@@ -100,11 +101,16 @@ final class ZernioPostTool extends AbstractZernioTool
     private const UPDATE_META_SUFFIX  = '/update-metadata';
     private const BULK_UPLOAD_PATH    = '/posts/bulk-upload';
     private const SYNC_EXTERNAL_PATH  = '/posts/sync-external';
-    private const STRING_ARRAY_TYPE   = 'string[]';
 
-    public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
-    {
-        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+    public function execute(
+        array $arguments,
+        int $agentId,
+        ?int $userId = null,
+        ?int $taskId = null,
+        ?PrincipalContext $context = null,
+    ): ToolResult {
+        $ownerId = $context->ownerUserId ?? $userId;
+        return $this->withConfig($agentId, $ownerId, fn(ZernioConfig $config): ToolResult => $this->guard(
             fn(): ToolResult => match ($this->getOperationName($arguments)) {
                 'list_posts'           => $this->listPosts($arguments, $config),
                 'get_post'             => $this->getById($arguments, $config, self::POST_PATH, 'post_id', 'get_post'),

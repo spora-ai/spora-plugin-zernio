@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Spora\Plugins\Zernio\Tools;
 
 use Spora\Plugins\Zernio\Support\ZernioConfig;
+use Spora\Services\PrincipalContext;
 use Spora\Tools\Attributes\Tool;
 use Spora\Tools\Attributes\ToolOperation;
 use Spora\Tools\Attributes\ToolParameter;
@@ -55,9 +56,15 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolParameter(name: 'limit', type: 'integer', description: 'Page size for post_analytics (1-100, default 50).', required: false, default: 50)]
 final class ZernioAnalyticsTool extends AbstractZernioTool
 {
-    public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
-    {
-        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+    public function execute(
+        array $arguments,
+        int $agentId,
+        ?int $userId = null,
+        ?int $taskId = null,
+        ?PrincipalContext $context = null,
+    ): ToolResult {
+        $ownerId = $context->ownerUserId ?? $userId;
+        return $this->withConfig($agentId, $ownerId, fn(ZernioConfig $config): ToolResult => $this->guard(
             fn(): ToolResult => match ($this->getOperationName($arguments)) {
                 'follower_analytics' => $this->followerAnalytics($arguments, $config),
                 'best_time_to_post'  => $this->bestTimeToPost($arguments, $config),

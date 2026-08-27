@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Spora\Plugins\Zernio\Tools;
 
 use Spora\Plugins\Zernio\Support\ZernioConfig;
+use Spora\Services\PrincipalContext;
 use Spora\Tools\Attributes\Tool;
 use Spora\Tools\Attributes\ToolOperation;
 use Spora\Tools\Attributes\ToolParameter;
@@ -43,9 +44,15 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolParameter(name: 'content', type: 'string', description: 'Base64-encoded file contents for upload_media. The plugin decodes them and re-encodes them as a JSON `data` field.', required: ['upload_media'])]
 final class ZernioMediaTool extends AbstractZernioTool
 {
-    public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
-    {
-        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+    public function execute(
+        array $arguments,
+        int $agentId,
+        ?int $userId = null,
+        ?int $taskId = null,
+        ?PrincipalContext $context = null,
+    ): ToolResult {
+        $ownerId = $context->ownerUserId ?? $userId;
+        return $this->withConfig($agentId, $ownerId, fn(ZernioConfig $config): ToolResult => $this->guard(
             fn(): ToolResult => match ($this->getOperationName($arguments)) {
                 'upload_media' => $this->uploadDirect($arguments, $config),
                 default        => $this->presign($arguments, $config),

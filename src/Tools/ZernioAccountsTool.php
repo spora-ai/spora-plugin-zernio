@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Spora\Plugins\Zernio\Tools;
 
 use Spora\Plugins\Zernio\Support\ZernioConfig;
+use Spora\Services\PrincipalContext;
 use Spora\Tools\Attributes\Tool;
 use Spora\Tools\Attributes\ToolOperation;
 use Spora\Tools\Attributes\ToolParameter;
@@ -58,9 +59,15 @@ final class ZernioAccountsTool extends AbstractZernioTool
     private const ACCOUNT_PATH      = '/accounts/';
     private const HEALTH_PATH       = '/accounts/health';
 
-    public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
-    {
-        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+    public function execute(
+        array $arguments,
+        int $agentId,
+        ?int $userId = null,
+        ?int $taskId = null,
+        ?PrincipalContext $context = null,
+    ): ToolResult {
+        $ownerId = $context->ownerUserId ?? $userId;
+        return $this->withConfig($agentId, $ownerId, fn(ZernioConfig $config): ToolResult => $this->guard(
             fn(): ToolResult => match ($this->getOperationName($arguments)) {
                 'list_profiles'      => $this->formatList('Profiles', $this->listProfiles($arguments, $config), 'profiles'),
                 'create_profile'     => $this->createProfile($arguments, $config),

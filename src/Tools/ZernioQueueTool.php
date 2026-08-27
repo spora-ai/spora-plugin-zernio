@@ -6,6 +6,7 @@ namespace Spora\Plugins\Zernio\Tools;
 
 use Spora\Plugins\Zernio\Support\QueuePayloadBuilder;
 use Spora\Plugins\Zernio\Support\ZernioConfig;
+use Spora\Services\PrincipalContext;
 use Spora\Tools\Attributes\Tool;
 use Spora\Tools\Attributes\ToolOperation;
 use Spora\Tools\Attributes\ToolParameter;
@@ -57,9 +58,15 @@ final class ZernioQueueTool extends AbstractZernioTool
 {
     private const SLOTS_PATH = '/queue/slots';
 
-    public function execute(array $arguments, int $agentId, ?int $userId = null, ?int $taskId = null): ToolResult
-    {
-        return $this->withConfig($agentId, $userId, fn(ZernioConfig $config): ToolResult => $this->guard(
+    public function execute(
+        array $arguments,
+        int $agentId,
+        ?int $userId = null,
+        ?int $taskId = null,
+        ?PrincipalContext $context = null,
+    ): ToolResult {
+        $ownerId = $context->ownerUserId ?? $userId;
+        return $this->withConfig($agentId, $ownerId, fn(ZernioConfig $config): ToolResult => $this->guard(
             fn(): ToolResult => match ($this->getOperationName($arguments)) {
                 'preview_queue' => $this->readPath('Queue preview', '/queue/preview', $arguments, $config),
                 'next_slot'     => $this->readPath('Next slot', '/queue/next-slot', $arguments, $config),
