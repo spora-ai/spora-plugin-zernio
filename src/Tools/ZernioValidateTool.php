@@ -28,7 +28,7 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolOperation(name: 'validate_post_length', description: 'Check whether the content fits a platform character limit', enabledByDefault: true, requiresApprovalByDefault: false)]
 #[ToolOperation(name: 'validate_media', description: 'Check whether a media URL is reachable', enabledByDefault: true, requiresApprovalByDefault: false)]
 #[ToolOperation(name: 'validate_subreddit', description: 'Check whether a subreddit exists on Reddit', enabledByDefault: true, requiresApprovalByDefault: false)]
-#[ToolSetting(key: 'api_key', label: 'Zernio API Key', type: 'password', description: 'Bearer token for the Zernio API. Falls back to the ZERNIO_API_KEY environment variable.', required: false)]
+#[ToolSetting(key: 'api_key', label: 'Zernio API Key', type: 'password', description: 'Bearer token for the Zernio API. Falls back to the ZERNIO_API_KEY environment variable.', required: true)]
 #[ToolSetting(key: 'base_url', label: 'Base URL', type: 'text', description: 'Zernio API base URL (default: https://zernio.com/api/v1).', default: 'https://zernio.com/api/v1')]
 #[ToolSetting(key: 'http_timeout', label: 'HTTP Timeout', type: 'text', description: 'Seconds before an HTTP request fails (default: 30).')]
 #[ToolParameter(name: 'content', type: 'string', description: 'Post text to validate. Required for validate_post_length; optional for validate_post.', required: ['validate_post_length'])]

@@ -35,7 +35,7 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolOperation(name: 'delete_webhook', description: 'Delete a webhook', enabledByDefault: true, requiresApprovalByDefault: true)]
 #[ToolOperation(name: 'get_webhook_logs', description: 'Get delivery logs for webhooks', enabledByDefault: true, requiresApprovalByDefault: false)]
 #[ToolOperation(name: 'test_webhook', description: 'Fire a synthetic webhook.test event to a URL', enabledByDefault: true, requiresApprovalByDefault: true)]
-#[ToolSetting(key: 'api_key', label: 'Zernio API Key', type: 'password', description: 'Bearer token for the Zernio API. Falls back to the ZERNIO_API_KEY environment variable.', required: false)]
+#[ToolSetting(key: 'api_key', label: 'Zernio API Key', type: 'password', description: 'Bearer token for the Zernio API. Falls back to the ZERNIO_API_KEY environment variable.', required: true)]
 #[ToolSetting(key: 'base_url', label: 'Base URL', type: 'text', description: 'Zernio API base URL (default: https://zernio.com/api/v1).', default: 'https://zernio.com/api/v1')]
 #[ToolSetting(key: 'http_timeout', label: 'HTTP Timeout', type: 'text', description: 'Seconds before an HTTP request fails (default: 30).')]
 #[ToolParameter(name: 'webhook_id', type: 'string', description: 'Webhook ID (the `_id` from list_webhooks). Required for update_webhook and delete_webhook; optional filter for get_webhook_logs.', required: ['update_webhook', 'delete_webhook'])]
