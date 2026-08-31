@@ -41,7 +41,7 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolOperation(name: 'update_post_metadata', description: 'Update YouTube video metadata (title, description, tags, privacy, thumbnail, playlist)', enabledByDefault: true, requiresApprovalByDefault: true)]
 #[ToolOperation(name: 'sync_external_posts', description: 'Sync posts authored on the platform outside Zernio for a given account', enabledByDefault: true, requiresApprovalByDefault: false)]
 #[ToolOperation(name: 'bulk_upload', description: 'Upload a CSV of posts to schedule in bulk (set dry_run=true to validate first)', enabledByDefault: true, requiresApprovalByDefault: true)]
-#[ToolSetting(key: 'api_key', label: 'Zernio API Key', type: 'password', description: 'Bearer token for the Zernio API. Falls back to the ZERNIO_API_KEY environment variable.', required: true)]
+#[ToolSetting(key: 'api_key', label: 'Zernio API Key', type: 'password', description: 'Bearer token for the Zernio API.', required: true)]
 #[ToolSetting(key: 'base_url', label: 'Base URL', type: 'text', description: 'Zernio API base URL (default: https://zernio.com/api/v1).', default: 'https://zernio.com/api/v1')]
 #[ToolSetting(key: 'http_timeout', label: 'HTTP Timeout', type: 'text', description: 'Seconds before an HTTP request fails (default: 30).')]
 #[ToolParameter(name: 'platforms', type: 'array', description: 'Per-platform targets: [{platform, accountId, customContent?, customMedia[]?, scheduledFor?, platformSpecificData?}, …]. Preferred over account_ids for new integrations.', required: false, items: ['type' => 'object'])]

@@ -39,7 +39,7 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolOperation(name: 'create_slot', description: 'Create a new queue schedule (the first call creates the profile default)', enabledByDefault: true, requiresApprovalByDefault: true)]
 #[ToolOperation(name: 'update_slot', description: 'Update an existing queue (or the default one if queue_id is omitted)', enabledByDefault: true, requiresApprovalByDefault: true)]
 #[ToolOperation(name: 'delete_slot', description: 'Delete a queue schedule', enabledByDefault: true, requiresApprovalByDefault: true)]
-#[ToolSetting(key: 'api_key', label: 'Zernio API Key', type: 'password', description: 'Bearer token for the Zernio API. Falls back to the ZERNIO_API_KEY environment variable.', required: true)]
+#[ToolSetting(key: 'api_key', label: 'Zernio API Key', type: 'password', description: 'Bearer token for the Zernio API.', required: true)]
 #[ToolSetting(key: 'base_url', label: 'Base URL', type: 'text', description: 'Zernio API base URL (default: https://zernio.com/api/v1).', default: 'https://zernio.com/api/v1')]
 #[ToolSetting(key: 'http_timeout', label: 'HTTP Timeout', type: 'text', description: 'Seconds before an HTTP request fails (default: 30).')]
 #[ToolParameter(name: 'profile_id', type: 'string', description: 'Profile ID the queue belongs to. Required for every operation.', required: ['list_slots', 'preview_queue', 'next_slot', 'create_slot', 'update_slot', 'delete_slot'])]
