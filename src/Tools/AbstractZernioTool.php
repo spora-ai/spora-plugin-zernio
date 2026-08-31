@@ -22,9 +22,11 @@ use Throwable;
  *   - the standard exception → {@see ToolResult} guard so a tool never throws
  *     into the agent loop.
  *
- * Credentials resolve from the tool's `api_key` setting, falling back to the
- * `ZERNIO_API_KEY` environment variable — so a self-hosted operator can set a
- * single key for all four Zernio tools instead of configuring each one.
+ * Credentials resolve solely from the tool's `api_key` setting; the operator
+ * must configure it per agent (or globally for the principal) via the
+ * settings UI. The `api_key` `#[ToolSetting]` is declared `required: true` on
+ * every concrete tool so the agent manifest surfaces it as missing before a
+ * call ever hits the wire.
  */
 abstract class AbstractZernioTool extends AbstractTool
 {
@@ -41,10 +43,6 @@ abstract class AbstractZernioTool extends AbstractTool
         $settings = $this->configService->getEffectiveSettings(static::class, $agentId, $userId);
 
         $apiKey = trim((string) ($settings['api_key'] ?? ''));
-        if ($apiKey === '') {
-            $envKey = getenv('ZERNIO_API_KEY');
-            $apiKey = is_string($envKey) ? trim($envKey) : '';
-        }
         if ($apiKey === '') {
             return null;
         }
@@ -81,7 +79,7 @@ abstract class AbstractZernioTool extends AbstractTool
     {
         return new ToolResult(
             false,
-            'Zernio API key is not configured. Set it in the tool settings or the ZERNIO_API_KEY environment variable.',
+            'Zernio API key is not configured. Set it in the tool settings for this agent.',
         );
     }
 

@@ -37,7 +37,7 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolOperation(name: 'daily_metrics', description: 'Cross-platform daily metrics rollup for a profile', enabledByDefault: true, requiresApprovalByDefault: false)]
 #[ToolOperation(name: 'posting_frequency', description: 'Posting frequency vs engagement for a profile', enabledByDefault: true, requiresApprovalByDefault: false)]
 #[ToolOperation(name: 'account_health', description: 'Bulk account health snapshot (token status, permissions)', enabledByDefault: true, requiresApprovalByDefault: false)]
-#[ToolSetting(key: 'api_key', label: 'Zernio API Key', type: 'password', description: 'Bearer token for the Zernio API. Falls back to the ZERNIO_API_KEY environment variable.', required: false)]
+#[ToolSetting(key: 'api_key', label: 'Zernio API Key', type: 'password', description: 'Bearer token for the Zernio API.', required: true)]
 #[ToolSetting(key: 'base_url', label: 'Base URL', type: 'text', description: 'Zernio API base URL (default: https://zernio.com/api/v1).', default: 'https://zernio.com/api/v1')]
 #[ToolSetting(key: 'http_timeout', label: 'HTTP Timeout', type: 'text', description: 'Seconds before an HTTP request fails (default: 30).')]
 #[ToolParameter(name: 'post_id', type: 'string', description: 'Post ID for post_analytics (single post lookup) and content_decay.', required: ['post_analytics', 'content_decay'])]

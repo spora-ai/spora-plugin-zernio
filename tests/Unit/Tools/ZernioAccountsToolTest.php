@@ -11,7 +11,6 @@ function accountsTool(HttpClientInterface $http, array $settings = ['api_key' =>
 }
 
 it('fails with a helpful message when no API key is configured', function (): void {
-    putenv('ZERNIO_API_KEY');
     $http = Mockery::mock(HttpClientInterface::class);
     $tool = accountsTool($http, []);
 
@@ -222,18 +221,15 @@ it('fetches per-account health via GET /accounts/{id}/health', function (): void
     expect($result->success)->toBeTrue();
 });
 
-it('falls back to the ZERNIO_API_KEY environment variable', function (): void {
+it('does not fall back to the ZERNIO_API_KEY environment variable', function (): void {
     putenv('ZERNIO_API_KEY=sk_env_key');
     $http = Mockery::mock(HttpClientInterface::class);
-    $http->expects('request')
-        ->with('GET', 'https://zernio.com/api/v1/accounts', Mockery::on(
-            fn(array $o): bool => $o['headers']['Authorization'] === 'Bearer sk_env_key',
-        ))
-        ->andReturn(zernioResponse(200, '{"accounts":[]}'));
+    $http->shouldNotReceive('request');
 
     $result = accountsTool($http, [])->execute(['action' => 'list_accounts'], agentId: 1);
 
-    expect($result->success)->toBeTrue();
+    expect($result->success)->toBeFalse()
+        ->and($result->content)->toContain('not configured');
     putenv('ZERNIO_API_KEY');
 });
 
