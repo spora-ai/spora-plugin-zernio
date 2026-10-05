@@ -44,6 +44,11 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolParameter(name: 'content', type: 'string', description: 'Base64-encoded file contents for upload_media. The plugin decodes them and re-encodes them as a JSON `data` field.', required: ['upload_media'])]
 final class ZernioMediaTool extends AbstractZernioTool
 {
+    /**
+     * @param int|null $userId Deprecated: the interface drops this parameter in core
+     *                          0.30.0; callers pass `$context->ownerUserId`. Unused
+     *                          here.
+     */
     public function execute(
         array $arguments,
         int $agentId,
@@ -51,7 +56,7 @@ final class ZernioMediaTool extends AbstractZernioTool
         ?int $taskId = null,
         ?PrincipalContext $context = null,
     ): ToolResult {
-        $ownerId = $context->ownerUserId ?? $userId;
+        $ownerId = $context?->ownerUserId;
         return $this->withConfig($agentId, $ownerId, fn(ZernioConfig $config): ToolResult => $this->guard(
             fn(): ToolResult => match ($this->getOperationName($arguments)) {
                 'upload_media' => $this->uploadDirect($arguments, $config),

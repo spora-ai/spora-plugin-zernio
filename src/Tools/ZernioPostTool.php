@@ -102,6 +102,11 @@ final class ZernioPostTool extends AbstractZernioTool
     private const BULK_UPLOAD_PATH    = '/posts/bulk-upload';
     private const SYNC_EXTERNAL_PATH  = '/posts/sync-external';
 
+    /**
+     * @param int|null $userId Deprecated: the interface drops this parameter in core
+     *                          0.30.0; callers pass `$context->ownerUserId`. Unused
+     *                          here.
+     */
     public function execute(
         array $arguments,
         int $agentId,
@@ -109,7 +114,7 @@ final class ZernioPostTool extends AbstractZernioTool
         ?int $taskId = null,
         ?PrincipalContext $context = null,
     ): ToolResult {
-        $ownerId = $context->ownerUserId ?? $userId;
+        $ownerId = $context?->ownerUserId;
         return $this->withConfig($agentId, $ownerId, fn(ZernioConfig $config): ToolResult => $this->guard(
             fn(): ToolResult => match ($this->getOperationName($arguments)) {
                 'list_posts'           => $this->listPosts($arguments, $config),
