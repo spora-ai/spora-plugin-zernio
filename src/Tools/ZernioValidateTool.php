@@ -38,6 +38,11 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolParameter(name: 'subreddit', type: 'string', description: 'Subreddit name (without "r/") to verify exists.', required: ['validate_subreddit'])]
 final class ZernioValidateTool extends AbstractZernioTool
 {
+    /**
+     * @deprecated 1.0 The interface drops this parameter in core 0.30.0;
+     *                 callers pass $context->ownerUserId. Still read as
+     *                 the fallback when that resolves to null.
+     */
     public function execute(
         array $arguments,
         int $agentId,

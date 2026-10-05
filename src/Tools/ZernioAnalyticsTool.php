@@ -56,6 +56,11 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolParameter(name: 'limit', type: 'integer', description: 'Page size for post_analytics (1-100, default 50).', required: false, default: 50)]
 final class ZernioAnalyticsTool extends AbstractZernioTool
 {
+    /**
+     * @deprecated 1.0 The interface drops this parameter in core 0.30.0;
+     *                 callers pass $context->ownerUserId. Still read as
+     *                 the fallback when that resolves to null.
+     */
     public function execute(
         array $arguments,
         int $agentId,

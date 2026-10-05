@@ -44,6 +44,11 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolParameter(name: 'content', type: 'string', description: 'Base64-encoded file contents for upload_media. The plugin decodes them and re-encodes them as a JSON `data` field.', required: ['upload_media'])]
 final class ZernioMediaTool extends AbstractZernioTool
 {
+    /**
+     * @deprecated 1.0 The interface drops this parameter in core 0.30.0;
+     *                 callers pass $context->ownerUserId. Still read as
+     *                 the fallback when that resolves to null.
+     */
     public function execute(
         array $arguments,
         int $agentId,
