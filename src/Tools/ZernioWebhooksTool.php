@@ -53,9 +53,9 @@ final class ZernioWebhooksTool extends AbstractZernioTool
     private const SETTINGS_PATH = '/webhooks/settings';
 
     /**
-     * @deprecated 1.0 The interface drops this parameter in core 0.30.0;
-     *                 callers pass $context->ownerUserId. Still read as
-     *                 the fallback when that resolves to null.
+     * @param int|null $userId Deprecated: the interface drops this parameter in core
+     *                          0.30.0; callers pass `$context->ownerUserId`. Still
+     *                          read as the fallback when that resolves to null.
      */
     public function execute(
         array $arguments,
