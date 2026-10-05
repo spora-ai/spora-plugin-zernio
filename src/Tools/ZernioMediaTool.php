@@ -46,8 +46,8 @@ final class ZernioMediaTool extends AbstractZernioTool
 {
     /**
      * @param int|null $userId Deprecated: the interface drops this parameter in core
-     *                          0.30.0; callers pass `$context->ownerUserId`. Still
-     *                          read as the fallback when that resolves to null.
+     *                          0.30.0; callers pass `$context->ownerUserId`. Unused
+     *                          here.
      */
     public function execute(
         array $arguments,
@@ -56,7 +56,7 @@ final class ZernioMediaTool extends AbstractZernioTool
         ?int $taskId = null,
         ?PrincipalContext $context = null,
     ): ToolResult {
-        $ownerId = $context->ownerUserId ?? $userId;
+        $ownerId = $context?->ownerUserId;
         return $this->withConfig($agentId, $ownerId, fn(ZernioConfig $config): ToolResult => $this->guard(
             fn(): ToolResult => match ($this->getOperationName($arguments)) {
                 'upload_media' => $this->uploadDirect($arguments, $config),
