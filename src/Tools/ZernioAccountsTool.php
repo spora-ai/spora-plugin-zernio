@@ -59,15 +59,9 @@ final class ZernioAccountsTool extends AbstractZernioTool
     private const ACCOUNT_PATH      = '/accounts/';
     private const HEALTH_PATH       = '/accounts/health';
 
-    /**
-     * @param int|null $userId Deprecated: the interface drops this parameter in core
-     *                          0.30.0; callers pass `$context->ownerUserId`. Unused
-     *                          here.
-     */
     public function execute(
         array $arguments,
         int $agentId,
-        ?int $userId = null,
         ?int $taskId = null,
         ?PrincipalContext $context = null,
     ): ToolResult {
