@@ -48,9 +48,11 @@ final class ZernioPlugin extends AbstractPlugin
      *
      * Keys are the English source text — `de.json` reads
      * `{"Zernio Post": "Zernio-Beiträge"}`, not `{"tool": "…"}`. That is
-     * what makes the host's `i18n:check` able to fail when a string is
-     * edited without being re-translated: the key changes and the old
-     * entry orphans.
+     * what makes a copy edit detectable: the key changes and the old entry
+     * orphans. The gate is this plugin's own `LocaleCatalogTest`, not the
+     * host's `i18n:check` — that command harvests core's `app/` and reads
+     * core's `locales/en.json`, so run against a plugin repo it reports
+     * every catalogue key as an orphan.
      *
      * **Only operator copy belongs in here.** A string the model reads is
      * never translated: not any of the seven `#[Tool].description` values,
@@ -59,8 +61,13 @@ final class ZernioPlugin extends AbstractPlugin
      * same three `#[ToolSetting]`s, so the flat catalogue holds their
      * three descriptions once rather than twenty-one times.
      *
-     * Requires `spora-core >= 0.31.0` at runtime; older versions fail to
-     * resolve the method when the loader is strict.
+     * `locales/de.json` holds the seven `#[Tool].displayName` values, the
+     * three shared `#[ToolSetting].description` values and the manifest
+     * description.
+     *
+     * Requires `spora-core >= 0.31.0` for the catalogue to be loaded. On an
+     * older core the host never calls this hook and the plugin renders in
+     * English.
      *
      * @return string[]
      */
