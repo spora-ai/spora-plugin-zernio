@@ -8,5 +8,6 @@
   "Zernio Validate": "Zernio-Validierung",
   "Bearer token for the Zernio API.": "Bearer-Token für die Zernio-API.",
   "Zernio API base URL (default: https://zernio.com/api/v1).": "Basis-URL der Zernio-API (Standard: https://zernio.com/api/v1).",
-  "Seconds before an HTTP request fails (default: 30).": "Sekunden, nach denen eine HTTP-Anfrage fehlschlägt (Standard: 30)."
+  "Seconds before an HTTP request fails (default: 30).": "Sekunden, nach denen eine HTTP-Anfrage fehlschlägt (Standard: 30).",
+  "Zernio social-media scheduling and publishing for Spora agents.": "Planung und Veröffentlichung von Social-Media-Beiträgen über Zernio für Spora-Agenten."
 }
