@@ -9,10 +9,9 @@ use Spora\Tools\ValueObjects\ToolResult;
 /**
  * Stateless helpers for building Zernio queue slot payloads and query maps.
  *
- * Kept out of {@see \Spora\Plugins\Zernio\Tools\ZernioQueueTool} so the
- * Tool class can stay under SonarQube's 20-method-per-class threshold.
- * All methods are pure: they take `$arguments` (and any other required
- * inputs) as parameters and never touch the HTTP client.
+ * Kept out of {@see \Spora\Plugins\Zernio\Tools\ZernioQueueTool} so that
+ * class stays inside SonarQube's method-count rule. All methods are pure:
+ * they take `$arguments` and never touch the HTTP client.
  *
  * The day-name → day-of-week-number map mirrors the Zernio spec:
  * 0 = Sunday, 6 = Saturday.
@@ -30,9 +29,9 @@ final class QueuePayloadBuilder
     ];
 
     /**
-     * Build the `?profileId&[queueId]&[count]` query used by every queue read
-     * (list/preview/next). Returns the failed ToolResult directly when the
-     * required `profile_id` argument is missing so callers can propagate.
+     * Build the `?profileId&[queueId]&[count]` query used by every queue read.
+     * Returns the failed ToolResult directly when the required `profile_id`
+     * argument is missing so callers can propagate.
      *
      * @param  array<string, mixed>   $arguments
      * @param  string                 $operation Name of the calling operation for the error message.
@@ -56,7 +55,8 @@ final class QueuePayloadBuilder
     }
 
     /**
-     * Assemble the create_queue body. Requires `name` plus at least one slot.
+     * Assemble the create_queue body. Requires `name`, a `profile_id` and at
+     * least one slot.
      *
      * @param  array<string, mixed> $arguments
      * @return array<string, mixed>|ToolResult
@@ -72,7 +72,7 @@ final class QueuePayloadBuilder
 
     /**
      * Assemble the update_queue body. Does not require `name` (omitted on
-     * partial updates) but still requires at least one slot.
+     * partial updates) but still requires a `profile_id` and at least one slot.
      *
      * @param  array<string, mixed> $arguments
      * @return array<string, mixed>|ToolResult
@@ -132,7 +132,7 @@ final class QueuePayloadBuilder
     }
 
     /**
-     * Resolve the `slots` argument either from an explicit array or from a
+     * Resolve the `slots` argument from either an explicit array or a
      * convenience `day` + `time` pair.
      *
      * @param  array<string, mixed> $arguments

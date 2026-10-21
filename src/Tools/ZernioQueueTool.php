@@ -16,16 +16,12 @@ use Spora\Tools\ValueObjects\ToolResult;
 /**
  * Manage Zernio's recurring posting queues — the named weekly time slots
  * that auto-scheduled posts drop into. The Zernio model is **queue → many
- * slots** (not many independent slots), so the operations below act on
- * queues. `day`/`time` are convenience parameters that get folded into the
- * required `slots[]` array. `queueId` is the identifier returned from
- * `list_slots` and is required to update or delete a non-default queue.
+ * slots** (not many independent slots), so the operations act on queues.
+ * `day`/`time` are convenience parameters folded into the required `slots[]`
+ * array.
  *
- * Read operations (`list_slots`, `preview_queue`, `next_slot`) need no
- * approval; queue mutations (`create_slot`, `update_slot`, `delete_slot`)
- * require approval. The slot/payload assembly lives in
- * {@see QueuePayloadBuilder} so this class
- * stays under the SonarQube 20-method limit.
+ * The slot/payload assembly lives in {@see QueuePayloadBuilder} so this class
+ * stays inside SonarQube's method-count rule.
  */
 #[Tool(
     name: 'zernio_queue',

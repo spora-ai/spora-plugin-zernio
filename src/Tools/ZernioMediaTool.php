@@ -13,19 +13,13 @@ use Spora\Tools\Attributes\ToolSetting;
 use Spora\Tools\ValueObjects\ToolResult;
 
 /**
- * Upload media (images/videos) to Zernio. The two-step flow:
+ * Upload media (images/videos) to Zernio.
  *
- *   1. Call `presign_media` to get a presigned S3 URL.
- *   2. PUT the file contents to that URL from your application code (the
- *      plugin does not upload the file itself — the agent is responsible
- *      for the binary transfer).
- *   3. Use the returned `public_url` in `media_items[].url` when creating
- *      a post.
- *
- * For small files, `upload_media` accepts base64-encoded bytes in `content`,
- * decodes them, and forwards them as a JSON `data` field (base64-encoded
- * again) in the body of POST `/v1/media/upload-direct`. The round-trip
- * avoids the multipart path because ZernioClient::post always sends JSON.
+ * `presign_media` returns a presigned S3 URL; the agent uploads the binary
+ * itself, then passes the resulting `public_url` to create_post. For small
+ * files `upload_media` takes base64 bytes and re-encodes them into a JSON
+ * `data` field — the round-trip avoids the multipart path because
+ * ZernioClient::post always sends JSON.
  */
 #[Tool(
     name: 'zernio_media',

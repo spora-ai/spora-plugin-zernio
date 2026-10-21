@@ -9,16 +9,15 @@ use Spora\Tools\ValueObjects\ToolResult;
 /**
  * Stateless helpers for building Zernio post create/update payloads.
  *
- * Kept out of {@see \Spora\Plugins\Zernio\Tools\ZernioPostTool} so the
- * Tool class can stay under SonarQube's 20-method-per-class threshold.
- * All methods are pure: they take `$arguments` and any other required
- * inputs as parameters and never touch the HTTP client.
+ * Kept out of {@see \Spora\Plugins\Zernio\Tools\ZernioPostTool} so that
+ * class stays inside SonarQube's method-count rule. All methods are pure:
+ * they take `$arguments` and never touch the HTTP client.
  */
 final class PostPayloadBuilder
 {
     /**
-     * Build the list of `platforms` for create_post. Accepts the explicit
-     * `platforms` array, or `account_ids` + a single `platform` for convenience.
+     * The explicit `platforms` array wins; otherwise `account_ids` plus a
+     * single `platform`.
      *
      * @param  array<string, mixed>          $arguments
      * @return list<array<string, mixed>>|ToolResult
@@ -95,7 +94,7 @@ final class PostPayloadBuilder
     }
 
     /**
-     * Pass-through for nested object payloads (recycling, tiktokSettings, …)
+     * Pass-through for nested object payloads (recycling, tiktokSettings, …),
      * only when the agent actually passed them.
      *
      * @param  array<string, mixed> $arguments

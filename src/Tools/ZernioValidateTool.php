@@ -13,10 +13,9 @@ use Spora\Tools\Attributes\ToolSetting;
 use Spora\Tools\ValueObjects\ToolResult;
 
 /**
- * Pre-flight checks for posts and media. Use these before `create_post` to
- * catch issues (over-limit length, missing required media, unreachable URL,
- * non-existent subreddit) instead of waiting for the post to fail at
- * publish time.
+ * Pre-flight checks for posts and media, so an agent can catch an over-limit
+ * length, a missing media item, an unreachable URL or a non-existent
+ * subreddit before the post fails at publish time.
  */
 #[Tool(
     name: 'zernio_validate',

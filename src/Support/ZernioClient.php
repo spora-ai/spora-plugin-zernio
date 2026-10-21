@@ -14,19 +14,16 @@ use Throwable;
 /**
  * Thin, authenticated wrapper over Symfony's HttpClient for the Zernio REST API.
  *
- * - Adds `Authorization: Bearer <api_key>` and JSON headers to every request.
- * - Joins the configured base URL with the endpoint path.
- * - Single-shot: every failure surfaces to the caller so the LLM can decide
- *   whether to retry. Earlier versions retried twice on 429/5xx — that was
- *   dangerous for this plugin: a social-media POST that retried on a transport
- *   timeout after the server had already committed the publish would double-post.
- * - Redacts the API key from all log entries.
- * - Decodes JSON responses to an array (empty body — e.g. a 204 from DELETE —
- *   decodes to []), and raises {@see ZernioApiException} on transport failure,
- *   HTTP >= 400, or a non-JSON body.
+ * Single-shot: every failure surfaces to the caller so the LLM can decide
+ * whether to retry. Earlier versions retried twice on 429/5xx — that was
+ * dangerous for this plugin: a social-media POST that retried on a transport
+ * timeout after the server had already committed the publish would double-post.
  *
- * Credentials/host/timeout are passed per call via {@see ZernioConfig} so the
- * client itself is stateless and shared across every Zernio tool via DI.
+ * An empty body (e.g. a 204 from DELETE) decodes to `[]`; a transport failure,
+ * an HTTP status >= 400 or a non-JSON body raises {@see ZernioApiException}.
+ *
+ * Credentials, host and timeout arrive per call via {@see ZernioConfig}, so
+ * the client itself is stateless and shared across every Zernio tool via DI.
  */
 final class ZernioClient
 {
@@ -37,7 +34,7 @@ final class ZernioClient
 
     /**
      * @param  array<string, scalar|null> $query
-     * @param  array<string, string>     $headers Extra headers to merge in (e.g. X-Request-Id for idempotency).
+     * @param  array<string, string>     $headers Extra headers to merge in (e.g. X-Request-Id).
      * @return array<string, mixed>
      */
     public function get(string $path, array $query, ZernioConfig $config, array $headers = []): array
@@ -47,7 +44,7 @@ final class ZernioClient
 
     /**
      * @param  array<string, mixed>      $body
-     * @param  array<string, string>     $headers Extra headers to merge in (e.g. X-Request-Id for idempotency).
+     * @param  array<string, string>     $headers Extra headers to merge in (e.g. X-Request-Id).
      * @return array<string, mixed>
      */
     public function post(string $path, array $body, ZernioConfig $config, array $headers = []): array

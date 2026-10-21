@@ -14,11 +14,8 @@ use Spora\Tools\ValueObjects\ToolResult;
 
 /**
  * Discovery and management of the social accounts and profiles connected to
- * the Zernio workspace. An agent uses `list_accounts` / `list_profiles` first
- * to learn which `account_ids` and platforms it can target; the remaining
- * operations manage profiles (CRUD) and accounts (rename, move, disconnect,
- * health) so an agent can keep the workspace tidy without going to the
- * dashboard.
+ * the Zernio workspace. `list_accounts` and `list_profiles` tell an agent
+ * which `account_ids` and platforms it can target.
  */
 #[Tool(
     name: 'zernio_accounts',

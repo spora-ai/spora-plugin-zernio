@@ -14,14 +14,11 @@ use Spora\Tools\ValueObjects\ToolResult;
 
 /**
  * Configure Zernio webhooks so the agent can react to platform events
- * (post published, account disconnected, lead submitted, etc.). Up to 10
- * webhooks per user; each subscribes to a subset of the 35+ available
- * event names. Webhooks are signed with HMAC-SHA256 via the
- * `X-Zernio-Signature` header using the per-webhook `secret`.
+ * (post published, account disconnected, lead submitted, etc.).
  *
- * Mutation operations (create/update/delete) require approval. Read
- * operations (list, logs) do not. `test_webhook` fires a synthetic event
- * to a URL to validate the receiver.
+ * Webhooks are signed with HMAC-SHA256 via the `X-Zernio-Signature` header
+ * using the per-webhook `secret`. `test_webhook` fires a synthetic event to a
+ * URL to validate the receiver.
  */
 #[Tool(
     name: 'zernio_webhooks',
