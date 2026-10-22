@@ -14,19 +14,13 @@ use Spora\Tools\ValueObjects\ToolResult;
 use Throwable;
 
 /**
- * Shared base for every Zernio tool. Centralises the cross-cutting concerns so
- * the concrete tools only describe their operations and format responses:
+ * Shared base for every Zernio tool: credential/host/timeout resolution into
+ * a {@see ZernioConfig}, and the exception → {@see ToolResult} guard so a
+ * tool never throws into the agent loop.
  *
- *   - constructor wiring (config service, HTTP client, logger);
- *   - credential/host/timeout resolution into a {@see ZernioConfig};
- *   - the standard exception → {@see ToolResult} guard so a tool never throws
- *     into the agent loop.
- *
- * Credentials resolve solely from the tool's `api_key` setting; the operator
- * must configure it per agent (or globally for the principal) via the
- * settings UI. The `api_key` `#[ToolSetting]` is declared `required: true` on
- * every concrete tool so the agent manifest surfaces it as missing before a
- * call ever hits the wire.
+ * Credentials resolve solely from the tool's `api_key` setting, which every
+ * concrete tool declares `required: true` so the agent manifest surfaces it
+ * as missing before a call ever hits the wire.
  */
 abstract class AbstractZernioTool extends AbstractTool
 {
@@ -103,8 +97,8 @@ abstract class AbstractZernioTool extends AbstractTool
     }
 
     /**
-     * Per-tool `http_timeout` setting → `SPORA_TOOL_HTTP_TIMEOUT` env → 30s,
-     * mirroring the cascade used by spora-core's ReadUrlTool.
+     * Per-tool `http_timeout` setting → `SPORA_TOOL_HTTP_TIMEOUT` from the
+     * environment → 30s.
      *
      * @param array<string, mixed> $settings
      */
@@ -152,8 +146,6 @@ abstract class AbstractZernioTool extends AbstractTool
     }
 
     /**
-     * Trimmed optional argument lookup shared by every tool.
-     *
      * @param array<string, mixed> $arguments
      */
     protected function arg(array $arguments, string $key): string
@@ -183,8 +175,6 @@ abstract class AbstractZernioTool extends AbstractTool
 
     /**
      * Pretty-print an API response for the tool result content.
-     *
-     * @param mixed $value
      */
     protected function encode(mixed $value): string
     {
@@ -194,8 +184,6 @@ abstract class AbstractZernioTool extends AbstractTool
     /**
      * Wrap an API response in a successful ToolResult that pretty-prints the
      * JSON. Centralised so the formatting stays consistent across tools.
-     *
-     * @param mixed $response
      */
     protected function jsonResult(string $label, mixed $response): ToolResult
     {
@@ -224,11 +212,8 @@ abstract class AbstractZernioTool extends AbstractTool
 
     /**
      * DELETE a resource by its ID, validating the ID is non-empty first.
-     * `$path` should be the path prefix ending in `/` (e.g. `/posts/`,
-     * `/profiles/`); the ID is appended via `rawurlencode` before the call.
-     * Returns a success ToolResult with a label and a data map keyed by
-     * the argument name (e.g. `data['post_id'] = "abc"`) plus any
-     * additional context keys passed in `$data`.
+     * `$path` is the path prefix ending in `/` (e.g. `/posts/`, `/profiles/`);
+     * the ID is appended via `rawurlencode` before the call.
      *
      * @param array<string, mixed>      $arguments
      * @param array<string, scalar|null> $query
@@ -278,10 +263,9 @@ abstract class AbstractZernioTool extends AbstractTool
     }
 
     /**
-     * Resolve the ZernioConfig for this call, then run the operation
-     * inside the exception guard. Returns a missing-credential ToolResult
-     * if no API key is configured. Centralises the prelude every tool
-     * had to repeat.
+     * Resolve the ZernioConfig for this call, then run the operation inside
+     * the exception guard. Returns a missing-credential ToolResult if no API
+     * key is configured.
      *
      * @param callable(ZernioConfig): ToolResult $operation
      */

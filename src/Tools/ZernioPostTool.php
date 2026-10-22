@@ -14,15 +14,18 @@ use Spora\Tools\Attributes\ToolSetting;
 use Spora\Tools\ValueObjects\ToolResult;
 
 /**
- * Create, schedule, publish, list, inspect, update, retry, unpublish, edit,
- * and bulk-upload Zernio posts. The `platforms` array is the primary input
- * for create_post and update_post (matching the Zernio OpenAPI shape); the
- * legacy `account_ids` + `platform` pair is still accepted for convenience.
+ * Zernio posts: create, schedule, publish, list, inspect, update, retry,
+ * unpublish, edit and bulk-upload.
  *
- * Publishing and deletion are irreversible on the target networks, so
- * `create_post`, `update_post`, `unpublish_post`, `bulk_upload`, and
- * `edit_post` require approval by default. `create_post` automatically
- * generates an `X-Request-Id` header for safe retry (idempotency).
+ * `platforms` is the primary input for create_post and update_post (matching
+ * the Zernio OpenAPI shape); the legacy `account_ids` + `platform` pair is
+ * still accepted for convenience.
+ *
+ * Publishing and deletion are irreversible on the target networks, which is
+ * why the mutating operations require approval by default.
+ *
+ * `create_post` sends a generated `X-Request-Id` header so a retry can be
+ * de-duplicated upstream.
  */
 #[Tool(
     name: 'zernio_post',

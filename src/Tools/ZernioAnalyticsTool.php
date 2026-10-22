@@ -13,16 +13,7 @@ use Spora\Tools\Attributes\ToolSetting;
 use Spora\Tools\ValueObjects\ToolResult;
 
 /**
- * Read-only analytics for Zernio. The endpoints here match the Zernio
- * OpenAPI spec v1.0.4:
- *
- *   - post_analytics         → GET /v1/analytics
- *   - follower_analytics     → GET /v1/accounts/follower-stats
- *   - best_time_to_post      → GET /v1/analytics/best-time
- *   - content_decay          → GET /v1/analytics/content-decay
- *   - daily_metrics          → GET /v1/analytics/daily-metrics
- *   - posting_frequency      → GET /v1/analytics/posting-frequency
- *   - account_health         → GET /v1/accounts/health (bulk)
+ * Read-only analytics for Zernio.
  */
 #[Tool(
     name: 'zernio_analytics',

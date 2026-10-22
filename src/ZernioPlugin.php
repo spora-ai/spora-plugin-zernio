@@ -16,10 +16,8 @@ use Spora\Plugins\Zernio\Tools\ZernioWebhooksTool;
 /**
  * Zernio plugin entry point.
  *
- * Extends {@see AbstractPlugin} so we only override the hooks we use
- * (getName() and tools()); the base class supplies no-op defaults for the
- * rest. Each tool's constructor takes only container-resolvable types, so
- * PHP-DI autowires them — no register() binding is required.
+ * Each tool's constructor takes only container-resolvable types, so PHP-DI
+ * autowires them — this plugin registers no container bindings of its own.
  */
 final class ZernioPlugin extends AbstractPlugin
 {
@@ -39,6 +37,18 @@ final class ZernioPlugin extends AbstractPlugin
             ZernioMediaTool::class,
             ZernioWebhooksTool::class,
             ZernioValidateTool::class,
+        ];
+    }
+
+    /**
+     * The plugin's `locales/` directory — one `<lang>.json` per language.
+     *
+     * @return string[]
+     */
+    public function translationsPaths(): array
+    {
+        return [
+            __DIR__ . '/../locales',
         ];
     }
 }
