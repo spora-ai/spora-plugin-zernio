@@ -609,3 +609,28 @@ it('describes each post operation for the approval UI', function (): void {
         ->and($tool->describeAction(['action' => 'create_post', 'account_ids' => ['a1'], 'platform' => 'twitter', 'queued_from_profile' => 'p1']))
         ->toContain('Queue-scheduled');
 });
+
+it('names the account in the approval prompt of an unpublish', function (): void {
+    $tool = postTool(Mockery::mock(HttpClientInterface::class));
+
+    $description = $tool->describeAction([
+        'action'                   => 'unpublish_post',
+        'post_id'                  => 'p1',
+        'platform_for_unpublish'   => 'facebook',
+        'account_id_for_unpublish' => 'a1',
+    ]);
+
+    expect($description)->toContain('a1');
+});
+
+it('leaves the account out of the approval prompt when none was named', function (): void {
+    $tool = postTool(Mockery::mock(HttpClientInterface::class));
+
+    $description = $tool->describeAction([
+        'action'                 => 'unpublish_post',
+        'post_id'                => 'p1',
+        'platform_for_unpublish' => 'facebook',
+    ]);
+
+    expect($description)->not->toContain('account');
+});

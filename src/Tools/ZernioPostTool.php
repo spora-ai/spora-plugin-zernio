@@ -138,7 +138,7 @@ final class ZernioPostTool extends AbstractZernioTool
             'update_post'          => 'Update Zernio post ' . $this->arg($arguments, 'post_id'),
             'delete_post'          => 'Delete Zernio post ' . $this->arg($arguments, 'post_id'),
             'retry_post'           => 'Retry Zernio post ' . $this->arg($arguments, 'post_id'),
-            'unpublish_post'       => 'Unpublish Zernio post ' . $this->arg($arguments, 'post_id') . ' from ' . $this->arg($arguments, 'platform_for_unpublish'),
+            'unpublish_post'       => 'Unpublish Zernio post ' . $this->arg($arguments, 'post_id') . ' from ' . $this->arg($arguments, 'platform_for_unpublish') . $this->unpublishAccountSuffix($arguments),
             'edit_post'            => 'Edit Zernio post ' . $this->arg($arguments, 'post_id'),
             'update_post_metadata' => 'Update YouTube metadata for Zernio post ' . $this->arg($arguments, 'post_id'),
             'sync_external_posts'  => 'Sync external posts for account ' . $this->arg($arguments, 'account_id'),
@@ -411,6 +411,19 @@ final class ZernioPostTool extends AbstractZernioTool
         $accountId = $this->arg($arguments, 'account_id_for_unpublish');
 
         return $accountId !== '' ? $accountId : $this->arg($arguments, 'account_id');
+    }
+
+    /**
+     * The account the operator approves, so the prompt says which copy of
+     * the post goes down. Absent when no account was named.
+     *
+     * @param array<string, mixed> $arguments
+     */
+    private function unpublishAccountSuffix(array $arguments): string
+    {
+        $accountId = $this->unpublishAccountId($arguments);
+
+        return $accountId === '' ? '' : ' (account ' . $accountId . ')';
     }
 
     /** @param array<string, mixed> $arguments */
