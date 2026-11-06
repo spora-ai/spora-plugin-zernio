@@ -377,7 +377,9 @@ it('unpublishes a post from a platform via POST /posts/{id}/unpublish', function
 
 it('names the account when unpublishing a post that reached several accounts of a platform', function (): void {
     // A post published to two accounts of one platform needs the account id,
-    // or Zernio answers 409 ambiguous_account and the post stays up.
+    // or Zernio answers 409 ambiguous_account and the post stays up. The
+    // general account parameter is still read, so a model that filled that
+    // one instead of the dedicated one still names the account.
     $http = Mockery::mock(HttpClientInterface::class);
     $http->expects('request')
         ->with('POST', 'https://zernio.com/api/v1/posts/post_1/unpublish', Mockery::on(
@@ -390,6 +392,46 @@ it('names the account when unpublishing a post that reached several accounts of 
         'post_id'                => 'post_1',
         'platform_for_unpublish' => 'facebook',
         'account_id'             => 'a1',
+    ], agentId: 1);
+
+    expect($result->success)->toBeTrue();
+});
+
+it('takes the account down from the account named for the unpublish', function (): void {
+    $http = Mockery::mock(HttpClientInterface::class);
+    $http->expects('request')
+        ->with('POST', 'https://zernio.com/api/v1/posts/post_1/unpublish', Mockery::on(
+            fn(array $o): bool => ($o['json'] ?? []) === ['platform' => 'facebook', 'accountId' => 'a1'],
+        ))
+        ->andReturn(zernioResponse(200, '{"deleted":true}'));
+
+    $result = postTool($http)->execute([
+        'action'                   => 'unpublish_post',
+        'post_id'                  => 'post_1',
+        'platform_for_unpublish'   => 'facebook',
+        'account_id_for_unpublish' => 'a1',
+    ], agentId: 1);
+
+    expect($result->success)->toBeTrue();
+});
+
+it('prefers the account named for the unpublish over the general account parameter', function (): void {
+    // `account_id` is a global parameter the model has to fill for other
+    // operations; the account named for this take-down is the one that
+    // decides.
+    $http = Mockery::mock(HttpClientInterface::class);
+    $http->expects('request')
+        ->with('POST', 'https://zernio.com/api/v1/posts/post_1/unpublish', Mockery::on(
+            fn(array $o): bool => ($o['json'] ?? []) === ['platform' => 'facebook', 'accountId' => 'a1'],
+        ))
+        ->andReturn(zernioResponse(200, '{"deleted":true}'));
+
+    $result = postTool($http)->execute([
+        'action'                   => 'unpublish_post',
+        'post_id'                  => 'post_1',
+        'platform_for_unpublish'   => 'facebook',
+        'account_id_for_unpublish' => 'a1',
+        'account_id'               => 'a2',
     ], agentId: 1);
 
     expect($result->success)->toBeTrue();
