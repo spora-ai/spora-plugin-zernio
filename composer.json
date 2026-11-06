@@ -26,8 +26,10 @@
   },
   "scripts": {
     "test": "pest",
+    "test:parallel": "pest --parallel --processes=auto --max-batch-size=50",
     "analyse": "phpstan analyse --no-progress --memory-limit=1G",
-    "lint": "php-cs-fixer fix --dry-run --diff --no-interaction"
+    "lint": "php-cs-fixer fix --dry-run --diff --no-interaction",
+    "format": "php-cs-fixer fix --no-interaction"
   },
   "config": {
     "optimize-autoloader": true,
