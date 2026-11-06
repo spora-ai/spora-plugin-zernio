@@ -68,7 +68,7 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolParameter(name: 'post_id', type: 'string', description: 'The post ID. Required for get_post, update_post, delete_post, retry_post, unpublish_post, edit_post, update_post_metadata.', required: ['get_post', 'update_post', 'delete_post', 'retry_post', 'unpublish_post', 'edit_post', 'update_post_metadata'])]
 #[ToolParameter(name: 'status', type: 'string', description: 'Filter posts by status (draft, scheduled, published, failed). Used by list_posts.', required: false)]
 #[ToolParameter(name: 'profile_id', type: 'string', description: 'Filter posts by profile ID. Used by list_posts.', required: false)]
-#[ToolParameter(name: 'account_id', type: 'string', description: 'Account ID. Filter for list_posts; required for sync_external_posts; alternative to post_id for update_post_metadata.', required: ['sync_external_posts'])]
+#[ToolParameter(name: 'account_id', type: 'string', description: 'Account ID. Filter for list_posts; required for sync_external_posts; alternative to post_id for update_post_metadata; for unpublish_post, the account the post goes down from — required when the post reached several accounts of that platform.', required: ['sync_external_posts'])]
 #[ToolParameter(name: 'platform_filter', type: 'string', description: 'Filter posts by platform (used by list_posts to avoid name clash with the create_post `platform` param).', required: false)]
 #[ToolParameter(name: 'date_from', type: 'string', description: 'Filter posts on or after this ISO date (YYYY-MM-DD). Used by list_posts.', required: false)]
 #[ToolParameter(name: 'date_to', type: 'string', description: 'Filter posts on or before this ISO date (YYYY-MM-DD). Used by list_posts.', required: false)]
@@ -78,7 +78,7 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolParameter(name: 'source', type: 'string', description: 'Post source for list_posts: "zernio" (default) or "external" (synced from the platform).', required: false)]
 #[ToolParameter(name: 'page', type: 'integer', description: 'Page number for list_posts (default 1).', required: false, default: 1)]
 #[ToolParameter(name: 'limit', type: 'integer', description: 'Page size for list_posts (default 10, max 100).', required: false, default: 10)]
-#[ToolParameter(name: 'platform_for_unpublish', type: 'string', description: 'Platform to unpublish the post from (threads, facebook, twitter, linkedin, youtube, pinterest, reddit, bluesky, googlebusiness, telegram). Required for unpublish_post.', required: ['unpublish_post'])]
+#[ToolParameter(name: 'platform_for_unpublish', type: 'string', description: 'Platform to unpublish the post from (threads, facebook, twitter, linkedin, youtube, pinterest, reddit, bluesky, googlebusiness, telegram). Required for unpublish_post. Add account_id when the post reached several accounts of this platform.', required: ['unpublish_post'])]
 #[ToolParameter(name: 'edit_content', type: 'string', description: 'New text content for edit_post (X Premium only).', required: ['edit_post'])]
 #[ToolParameter(name: 'video_id', type: 'string', description: 'YouTube video ID for update_post_metadata (alternative to post_id-based update).', required: false)]
 #[ToolParameter(name: 'yt_title', type: 'string', description: 'YouTube video title for update_post_metadata.', required: false)]
@@ -373,7 +373,10 @@ final class ZernioPostTool extends AbstractZernioTool
             self::POST_PATH,
             self::UNPUBLISH_SUFFIX,
             'unpublish_post',
-            body: ['platform' => $platform],
+            body: $this->stringMap($arguments, [
+                'platform_for_unpublish' => 'platform',
+                'account_id'             => 'accountId',
+            ]),
             successLabel: "Unpublished post from {$platform}:\n",
         );
     }

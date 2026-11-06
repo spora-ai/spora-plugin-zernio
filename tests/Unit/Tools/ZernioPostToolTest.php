@@ -375,6 +375,45 @@ it('unpublishes a post from a platform via POST /posts/{id}/unpublish', function
     expect($result->success)->toBeTrue();
 });
 
+it('names the account when unpublishing a post that reached several accounts of a platform', function (): void {
+    // A post published to two accounts of one platform needs the account id,
+    // or Zernio answers 409 ambiguous_account and the post stays up.
+    $http = Mockery::mock(HttpClientInterface::class);
+    $http->expects('request')
+        ->with('POST', 'https://zernio.com/api/v1/posts/post_1/unpublish', Mockery::on(
+            fn(array $o): bool => ($o['json'] ?? []) === ['platform' => 'facebook', 'accountId' => 'a1'],
+        ))
+        ->andReturn(zernioResponse(200, '{"deleted":true}'));
+
+    $result = postTool($http)->execute([
+        'action'                 => 'unpublish_post',
+        'post_id'                => 'post_1',
+        'platform_for_unpublish' => 'facebook',
+        'account_id'             => 'a1',
+    ], agentId: 1);
+
+    expect($result->success)->toBeTrue();
+});
+
+it('omits the account id when unpublishing without one', function (): void {
+    $http = Mockery::mock(HttpClientInterface::class);
+    $http->expects('request')
+        ->with('POST', 'https://zernio.com/api/v1/posts/post_1/unpublish', Mockery::on(function (array $o): bool {
+            $json = $o['json'] ?? [];
+            return ($json['platform'] ?? null) === 'facebook'
+                && !isset($json['accountId']);
+        }))
+        ->andReturn(zernioResponse(200, '{"deleted":true}'));
+
+    $result = postTool($http)->execute([
+        'action'                 => 'unpublish_post',
+        'post_id'                => 'post_1',
+        'platform_for_unpublish' => 'facebook',
+    ], agentId: 1);
+
+    expect($result->success)->toBeTrue();
+});
+
 it('edits a Twitter post via POST /posts/{id}/edit', function (): void {
     $http = Mockery::mock(HttpClientInterface::class);
     $http->expects('request')
