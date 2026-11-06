@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Spora\Plugins\Zernio\Tools;
 
 use Spora\Plugins\Zernio\Support\PostPayloadBuilder;
+use Spora\Plugins\Zernio\Support\UnpublishRequest;
 use Spora\Plugins\Zernio\Support\ZernioConfig;
 use Spora\Services\PrincipalContext;
 use Spora\Tools\Attributes\Tool;
@@ -138,7 +139,7 @@ final class ZernioPostTool extends AbstractZernioTool
             'update_post'          => 'Update Zernio post ' . $this->arg($arguments, 'post_id'),
             'delete_post'          => 'Delete Zernio post ' . $this->arg($arguments, 'post_id'),
             'retry_post'           => 'Retry Zernio post ' . $this->arg($arguments, 'post_id'),
-            'unpublish_post'       => 'Unpublish Zernio post ' . $this->arg($arguments, 'post_id') . ' from ' . $this->arg($arguments, 'platform_for_unpublish') . $this->unpublishAccountSuffix($arguments),
+            'unpublish_post'       => 'Unpublish Zernio post ' . $this->arg($arguments, 'post_id') . ' from ' . $this->arg($arguments, 'platform_for_unpublish') . UnpublishRequest::accountSuffix($arguments),
             'edit_post'            => 'Edit Zernio post ' . $this->arg($arguments, 'post_id'),
             'update_post_metadata' => 'Update YouTube metadata for Zernio post ' . $this->arg($arguments, 'post_id'),
             'sync_external_posts'  => 'Sync external posts for account ' . $this->arg($arguments, 'account_id'),
@@ -374,56 +375,9 @@ final class ZernioPostTool extends AbstractZernioTool
             self::POST_PATH,
             self::UNPUBLISH_SUFFIX,
             'unpublish_post',
-            body: $this->unpublishBody($arguments, $platform),
+            body: UnpublishRequest::body($arguments, $platform),
             successLabel: "Unpublished post from {$platform}:\n",
         );
-    }
-
-    /**
-     * @param  array<string, mixed> $arguments
-     * @return array<string, string>
-     */
-    private function unpublishBody(array $arguments, string $platform): array
-    {
-        $accountId = $this->unpublishAccountId($arguments);
-
-        $body = ['platform' => $platform];
-        if ($accountId !== '') {
-            $body['accountId'] = $accountId;
-        }
-
-        return $body;
-    }
-
-    /**
-     * The account the copy goes down from.
-     *
-     * `account_id_for_unpublish` decides, because it is the one parameter
-     * every agent is offered — `account_id` is bound to `sync_external_posts`
-     * and an agent that may only unpublish never sees it. `account_id` is
-     * still read, so a model that filled the general parameter instead of
-     * the dedicated one still names the account.
-     *
-     * @param array<string, mixed> $arguments
-     */
-    private function unpublishAccountId(array $arguments): string
-    {
-        $accountId = $this->arg($arguments, 'account_id_for_unpublish');
-
-        return $accountId !== '' ? $accountId : $this->arg($arguments, 'account_id');
-    }
-
-    /**
-     * The account the operator approves, so the prompt says which copy of
-     * the post goes down. Absent when no account was named.
-     *
-     * @param array<string, mixed> $arguments
-     */
-    private function unpublishAccountSuffix(array $arguments): string
-    {
-        $accountId = $this->unpublishAccountId($arguments);
-
-        return $accountId === '' ? '' : ' (account ' . $accountId . ')';
     }
 
     /** @param array<string, mixed> $arguments */
