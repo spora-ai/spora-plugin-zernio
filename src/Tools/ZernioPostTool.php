@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Spora\Plugins\Zernio\Tools;
 
 use Spora\Plugins\Zernio\Support\PostPayloadBuilder;
+use Spora\Plugins\Zernio\Support\UnpublishRequest;
 use Spora\Plugins\Zernio\Support\ZernioConfig;
 use Spora\Services\PrincipalContext;
 use Spora\Tools\Attributes\Tool;
@@ -39,7 +40,7 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolOperation(name: 'update_post', description: 'Update a draft, scheduled, or failed post', enabledByDefault: true, requiresApprovalByDefault: true)]
 #[ToolOperation(name: 'delete_post', description: 'Delete a draft or scheduled post (use unpublish_post for published ones)', enabledByDefault: true, requiresApprovalByDefault: true)]
 #[ToolOperation(name: 'retry_post', description: 'Retry a failed post', enabledByDefault: true, requiresApprovalByDefault: true)]
-#[ToolOperation(name: 'unpublish_post', description: 'Unpublish a published post from a specific platform', enabledByDefault: true, requiresApprovalByDefault: true)]
+#[ToolOperation(name: 'unpublish_post', description: 'Unpublish a published post from a specific platform. When the post reached several accounts of that platform, name the account to take down in account_id_for_unpublish — Zernio refuses with 409 ambiguous_account otherwise.', enabledByDefault: true, requiresApprovalByDefault: true)]
 #[ToolOperation(name: 'edit_post', description: 'Edit the text of an X (Twitter) Premium post (within ~1h, max 5 edits)', enabledByDefault: true, requiresApprovalByDefault: true)]
 #[ToolOperation(name: 'update_post_metadata', description: 'Update YouTube video metadata (title, description, tags, privacy, thumbnail, playlist)', enabledByDefault: true, requiresApprovalByDefault: true)]
 #[ToolOperation(name: 'sync_external_posts', description: 'Sync posts authored on the platform outside Zernio for a given account', enabledByDefault: true, requiresApprovalByDefault: false)]
@@ -78,7 +79,8 @@ use Spora\Tools\ValueObjects\ToolResult;
 #[ToolParameter(name: 'source', type: 'string', description: 'Post source for list_posts: "zernio" (default) or "external" (synced from the platform).', required: false)]
 #[ToolParameter(name: 'page', type: 'integer', description: 'Page number for list_posts (default 1).', required: false, default: 1)]
 #[ToolParameter(name: 'limit', type: 'integer', description: 'Page size for list_posts (default 10, max 100).', required: false, default: 10)]
-#[ToolParameter(name: 'platform_for_unpublish', type: 'string', description: 'Platform to unpublish the post from (threads, facebook, twitter, linkedin, youtube, pinterest, reddit, bluesky, googlebusiness, telegram). Required for unpublish_post.', required: ['unpublish_post'])]
+#[ToolParameter(name: 'platform_for_unpublish', type: 'string', description: 'Platform to unpublish the post from (threads, facebook, twitter, linkedin, youtube, pinterest, reddit, bluesky, googlebusiness, telegram). Required for unpublish_post. Add account_id_for_unpublish when the post reached several accounts of this platform.', required: ['unpublish_post'])]
+#[ToolParameter(name: 'account_id_for_unpublish', type: 'string', description: 'The account whose copy of the post goes down. Send it when the post reached several accounts of that platform — Zernio refuses with 409 ambiguous_account otherwise. Leave it out when the post reached exactly one account.', required: false)]
 #[ToolParameter(name: 'edit_content', type: 'string', description: 'New text content for edit_post (X Premium only).', required: ['edit_post'])]
 #[ToolParameter(name: 'video_id', type: 'string', description: 'YouTube video ID for update_post_metadata (alternative to post_id-based update).', required: false)]
 #[ToolParameter(name: 'yt_title', type: 'string', description: 'YouTube video title for update_post_metadata.', required: false)]
@@ -137,7 +139,7 @@ final class ZernioPostTool extends AbstractZernioTool
             'update_post'          => 'Update Zernio post ' . $this->arg($arguments, 'post_id'),
             'delete_post'          => 'Delete Zernio post ' . $this->arg($arguments, 'post_id'),
             'retry_post'           => 'Retry Zernio post ' . $this->arg($arguments, 'post_id'),
-            'unpublish_post'       => 'Unpublish Zernio post ' . $this->arg($arguments, 'post_id') . ' from ' . $this->arg($arguments, 'platform_for_unpublish'),
+            'unpublish_post'       => 'Unpublish Zernio post ' . $this->arg($arguments, 'post_id') . ' from ' . $this->arg($arguments, 'platform_for_unpublish') . UnpublishRequest::accountSuffix($arguments),
             'edit_post'            => 'Edit Zernio post ' . $this->arg($arguments, 'post_id'),
             'update_post_metadata' => 'Update YouTube metadata for Zernio post ' . $this->arg($arguments, 'post_id'),
             'sync_external_posts'  => 'Sync external posts for account ' . $this->arg($arguments, 'account_id'),
@@ -373,7 +375,7 @@ final class ZernioPostTool extends AbstractZernioTool
             self::POST_PATH,
             self::UNPUBLISH_SUFFIX,
             'unpublish_post',
-            body: ['platform' => $platform],
+            body: UnpublishRequest::body($arguments, $platform),
             successLabel: "Unpublished post from {$platform}:\n",
         );
     }

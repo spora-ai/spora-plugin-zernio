@@ -375,6 +375,87 @@ it('unpublishes a post from a platform via POST /posts/{id}/unpublish', function
     expect($result->success)->toBeTrue();
 });
 
+it('names the account when unpublishing a post that reached several accounts of a platform', function (): void {
+    // A post published to two accounts of one platform needs the account id,
+    // or Zernio answers 409 ambiguous_account and the post stays up. The
+    // general account parameter is still read, so a model that filled that
+    // one instead of the dedicated one still names the account.
+    $http = Mockery::mock(HttpClientInterface::class);
+    $http->expects('request')
+        ->with('POST', 'https://zernio.com/api/v1/posts/post_1/unpublish', Mockery::on(
+            fn(array $o): bool => ($o['json'] ?? []) === ['platform' => 'facebook', 'accountId' => 'a1'],
+        ))
+        ->andReturn(zernioResponse(200, '{"deleted":true}'));
+
+    $result = postTool($http)->execute([
+        'action'                 => 'unpublish_post',
+        'post_id'                => 'post_1',
+        'platform_for_unpublish' => 'facebook',
+        'account_id'             => 'a1',
+    ], agentId: 1);
+
+    expect($result->success)->toBeTrue();
+});
+
+it('takes the account down from the account named for the unpublish', function (): void {
+    $http = Mockery::mock(HttpClientInterface::class);
+    $http->expects('request')
+        ->with('POST', 'https://zernio.com/api/v1/posts/post_1/unpublish', Mockery::on(
+            fn(array $o): bool => ($o['json'] ?? []) === ['platform' => 'facebook', 'accountId' => 'a1'],
+        ))
+        ->andReturn(zernioResponse(200, '{"deleted":true}'));
+
+    $result = postTool($http)->execute([
+        'action'                   => 'unpublish_post',
+        'post_id'                  => 'post_1',
+        'platform_for_unpublish'   => 'facebook',
+        'account_id_for_unpublish' => 'a1',
+    ], agentId: 1);
+
+    expect($result->success)->toBeTrue();
+});
+
+it('prefers the account named for the unpublish over the general account parameter', function (): void {
+    // `account_id` is a global parameter the model has to fill for other
+    // operations; the account named for this take-down is the one that
+    // decides.
+    $http = Mockery::mock(HttpClientInterface::class);
+    $http->expects('request')
+        ->with('POST', 'https://zernio.com/api/v1/posts/post_1/unpublish', Mockery::on(
+            fn(array $o): bool => ($o['json'] ?? []) === ['platform' => 'facebook', 'accountId' => 'a1'],
+        ))
+        ->andReturn(zernioResponse(200, '{"deleted":true}'));
+
+    $result = postTool($http)->execute([
+        'action'                   => 'unpublish_post',
+        'post_id'                  => 'post_1',
+        'platform_for_unpublish'   => 'facebook',
+        'account_id_for_unpublish' => 'a1',
+        'account_id'               => 'a2',
+    ], agentId: 1);
+
+    expect($result->success)->toBeTrue();
+});
+
+it('omits the account id when unpublishing without one', function (): void {
+    $http = Mockery::mock(HttpClientInterface::class);
+    $http->expects('request')
+        ->with('POST', 'https://zernio.com/api/v1/posts/post_1/unpublish', Mockery::on(function (array $o): bool {
+            $json = $o['json'] ?? [];
+            return ($json['platform'] ?? null) === 'facebook'
+                && !isset($json['accountId']);
+        }))
+        ->andReturn(zernioResponse(200, '{"deleted":true}'));
+
+    $result = postTool($http)->execute([
+        'action'                 => 'unpublish_post',
+        'post_id'                => 'post_1',
+        'platform_for_unpublish' => 'facebook',
+    ], agentId: 1);
+
+    expect($result->success)->toBeTrue();
+});
+
 it('edits a Twitter post via POST /posts/{id}/edit', function (): void {
     $http = Mockery::mock(HttpClientInterface::class);
     $http->expects('request')
@@ -527,4 +608,29 @@ it('describes each post operation for the approval UI', function (): void {
         ->toContain('Scheduled')
         ->and($tool->describeAction(['action' => 'create_post', 'account_ids' => ['a1'], 'platform' => 'twitter', 'queued_from_profile' => 'p1']))
         ->toContain('Queue-scheduled');
+});
+
+it('names the account in the approval prompt of an unpublish', function (): void {
+    $tool = postTool(Mockery::mock(HttpClientInterface::class));
+
+    $description = $tool->describeAction([
+        'action'                   => 'unpublish_post',
+        'post_id'                  => 'p1',
+        'platform_for_unpublish'   => 'facebook',
+        'account_id_for_unpublish' => 'a1',
+    ]);
+
+    expect($description)->toContain('a1');
+});
+
+it('leaves the account out of the approval prompt when none was named', function (): void {
+    $tool = postTool(Mockery::mock(HttpClientInterface::class));
+
+    $description = $tool->describeAction([
+        'action'                 => 'unpublish_post',
+        'post_id'                => 'p1',
+        'platform_for_unpublish' => 'facebook',
+    ]);
+
+    expect($description)->not->toContain('account');
 });

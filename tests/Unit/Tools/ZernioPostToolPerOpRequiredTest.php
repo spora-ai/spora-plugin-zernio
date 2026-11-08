@@ -34,6 +34,13 @@ it('binds account_id to sync_external_posts', function (): void {
     expect($actual)->toBe($expected);
 });
 
+it('binds the unpublish account to no operation', function (): void {
+    // No binding at all is what keeps the parameter advertised to every
+    // agent: a binding would hide it from the agents that may only
+    // unpublish, and would make it mandatory for them.
+    expect(postToolParameterArgs('account_id_for_unpublish')['required'])->toBeFalse();
+});
+
 it('binds platform_for_unpublish to unpublish_post', function (): void {
     $expected = ['unpublish_post'];
     sort($expected);
